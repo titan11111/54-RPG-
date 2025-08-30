@@ -152,6 +152,7 @@ let lastTile=null;        // 侵入デバウンス
 const rand=(n)=>Math.floor(Math.random()*n);
 let steps=0;              // 累計移動マス
 let kills=0;              // 討伐数
+let oniDefeated=false;    // 青い城の鬼撃破
 const STEP_INTERVAL=10;   // この歩数ごとに敵出現（頻度アップ）
 const KILLS_PER_LEVEL=10; // レベルアップに必要な討伐数増分
 
@@ -174,7 +175,7 @@ function startBattleBGM(){ if(bgmInterval) return; const notes=[220,262,294,330]
 
 // ===== map
 const TILE=16,W=64,H=64;
-const T={GRASS:0,TOWN:1,CASTLE:2,CAVE:3,VILLAGE:4,TEMPLE:5,FOREST:6,RIVER:7};
+const T={GRASS:0,TOWN:1,CASTLE:2,CAVE:3,VILLAGE:4,TEMPLE:5,FOREST:6,RIVER:7,BLUECASTLE:8};
 const map=[...Array(H)].map(()=>Array(W).fill(T.GRASS));
 // 地形
 for(let y=0;y<H;y++)for(let x=0;x<W;x++){
@@ -185,6 +186,7 @@ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
 map[5][58]=T.CASTLE;      // 右上付近：城
 map[50][6]=T.CASTLE;      // 左下付近：城
 map[25][25]=T.CASTLE;     // 中央：城
+map[58][58]=T.BLUECASTLE; // 南東：青い城
 map[30][32]=T.CAVE;       // 下中央：洞窟
 map[8][8]=T.TOWN;         // 左上：町
 map[10][20]=T.VILLAGE;    // その右：村
@@ -203,6 +205,7 @@ const placeName=t=>{
     case T.TOWN: return "町";
     case T.VILLAGE: return "村";
     case T.CASTLE: return "城";
+    case T.BLUECASTLE: return "青い城";
     case T.TEMPLE: return "神殿";
     case T.CAVE: return "洞窟";
   }
@@ -330,9 +333,11 @@ const rares=[
   {name:'はぐれねこくん',hp:10,atk:[4,8],exp:40,gold:60},
   {name:'クルミっぽ',hp:12,atk:[5,9],exp:50,gold:80}
 ];
-function startBattle(isBoss=false){
+const oni={name:'鬼',hp:50,atk:[4,7],exp:18,gold:30};
+function startBattle(isBoss=false, forced=null){
   boss=isBoss; stopBGM(); startBattleBGM(); uiLocked=true;
-  if(boss){ enemy={name:'魔王',hp:50,atk:[6,12],exp:120,gold:300}; }
+  if(boss){ enemy={name:'魔王',hp:100,atk:[6,12],exp:120,gold:300}; }
+  else if(forced){ enemy={...forced}; }
   else{
     const pool=(Math.random()<0.33)?commons.concat(rares):commons;
     const e=pool[rand(pool.length)]; enemy={...e};
@@ -345,7 +350,8 @@ $('atkBtn').onclick=()=>{
   const pdmg=5+rand(4); enemy.hp=Math.max(0,enemy.hp-pdmg); $('ehp').textContent=enemy.hp;
   if(enemy.hp<=0){
     $('battleOverlay').classList.add('hidden'); uiLocked=false;
-    kills++; player.gold+=enemy.gold||0;
+    if(enemy.name==='鬼'){ kills+=1.5; oniDefeated=true; } else { kills++; }
+    player.gold+=enemy.gold||0;
     if(kills>=player.lv*KILLS_PER_LEVEL){
       player.lv++; player.max+=5; player.hp=player.max;
     }
@@ -381,12 +387,16 @@ function draw(){
   for(let dy=-half;dy<=half;dy++)for(let dx=-half;dx<=half;dx++){
     const mx=cx+dx, my=cy+dy; if(mx<0||my<0||mx>=W||my>=H) continue;
     const t=map[my][mx]; const px=(dx+half)*TILE, py=(dy+half)*TILE;
-    ctx.fillStyle = (t===T.RIVER?'#123aee':'#1b2430'); ctx.fillRect(px,py,TILE,TILE);
+    let color='#1b2430';
+    if(t===T.RIVER) color='#123aee';
+    if(t===T.BLUECASTLE) color='#102060';
+    ctx.fillStyle=color; ctx.fillRect(px,py,TILE,TILE);
     let e='';
     if(t===T.FOREST) e='🌳';
     if(t===T.TOWN)   e='🏘️';
     if(t===T.VILLAGE)e='🛖';
     if(t===T.CASTLE) e='🏰';
+    if(t===T.BLUECASTLE) e='🏰';
     if(t===T.TEMPLE) e='🏛️';
     if(t===T.CAVE)   e='🕳️';
     if(e) ctx.fillText(e,px+2,py+14);
@@ -397,7 +407,7 @@ function draw(){
 function drawMini(){
   const sc=2; mctx.fillStyle='#000'; mctx.fillRect(0,0,mini.width,mini.height);
   mctx.fillStyle='#fff';
-  [T.TOWN,T.VILLAGE,T.CASTLE,T.TEMPLE,T.CAVE].forEach(tt=>{
+  [T.TOWN,T.VILLAGE,T.CASTLE,T.TEMPLE,T.CAVE,T.BLUECASTLE].forEach(tt=>{
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){
       if(map[y][x]===tt) mctx.fillRect(x*sc,y*sc,sc,sc);
     }
@@ -414,6 +424,7 @@ function handleTileEntry(t){
   if(t===T.TOWN){ openShop('town'); return; }
   if(t===T.VILLAGE){ openShop('village'); return; }
   if(t===T.CASTLE){ openCastle(); return; }
+  if(t===T.BLUECASTLE){ if(!oniDefeated){ startBattle(false,oni); } return; }
   if(t===T.TEMPLE){ openTemple(player.y,player.x); return; }
   if(t===T.CAVE){ startBattle(true); return; }
 
