@@ -5,41 +5,52 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>NEO FIELD QUEST</title>
 <style>
-body{margin:0;background:#0b0f14;color:#e5f1ff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;overflow:hidden}
-canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pixelated}
-.hud{display:flex;gap:12px;margin:8px}
-.panel{background:#0e1520aa;padding:8px 12px;border-radius:8px;border:1px solid #223545}
-.hpbar{height:8px;background:#092231;border-radius:6px;overflow:hidden}
-.hpfill{height:100%;background:linear-gradient(90deg,#20ffe3,#5df6ff)}
-.controller{position:fixed;bottom:20px;width:100%;display:flex;justify-content:space-between;padding:0 40px;pointer-events:none}
-.dpad,.buttons{pointer-events:auto}
-.dpad{display:grid;grid-template-columns:repeat(3,100px);grid-template-rows:repeat(3,100px);gap:8px}
-.dpad button{width:100px;height:100px;font-size:28px;border-radius:20px}
-.buttons{display:flex;flex-direction:column;gap:20px}
-.buttons button{width:120px;height:100px;font-size:22px;border-radius:20px}
-.btn{background:#0a121d;border:1px solid #1e3550;color:#e5f1ff;font-weight:bold}
-.btn:active{transform:translateY(1px)}
-.A{border-color:#20ffe3;color:#20ffe3}
-.B{border-color:#ff4dcb;color:#ff4dcb}
-.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000c;z-index:5}
-.card{background:#08111b;border:2px solid #20ffe3;border-radius:12px;padding:20px;min-width:280px;text-align:center}
-.hidden{display:none}
-#npcOverlay .card{ text-align:left; font-size:18px; line-height:1.6em; max-width:420px }
-#shopItems button{display:block;width:100%;margin:5px 0;padding:10px;font-size:18px}
+  body{margin:0;background:#0b0f14;color:#e5f1ff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;overflow:hidden}
+  canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pixelated}
+  .hud{display:flex;gap:12px;margin:8px}
+  .panel{background:#0e1520aa;padding:8px 12px;border-radius:8px;border:1px solid #223545}
+  .hpbar{height:8px;background:#092231;border-radius:6px;overflow:hidden}
+  .hpfill{height:100%;background:linear-gradient(90deg,#20ffe3,#5df6ff)}
+  .controller{position:fixed;bottom:20px;width:100%;display:flex;justify-content:space-between;padding:0 40px;pointer-events:none}
+  .dpad,.buttons{pointer-events:auto}
+  .dpad{display:grid;grid-template-columns:repeat(3,100px);grid-template-rows:repeat(3,100px);gap:8px}
+  .dpad button{width:100px;height:100px;font-size:28px;border-radius:20px}
+  .buttons{display:flex;flex-direction:column;gap:20px}
+  .buttons button{width:120px;height:100px;font-size:22px;border-radius:20px}
+  .btn{background:#0a121d;border:1px solid #1e3550;color:#e5f1ff;font-weight:bold}
+  .btn:active{transform:translateY(1px)}
+  .A{border-color:#20ffe3;color:#20ffe3}
+  .B{border-color:#ff4dcb;color:#ff4dcb}
+  .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000c;z-index:5}
+  .card{background:#08111b;border:2px solid #20ffe3;border-radius:12px;padding:20px;min-width:280px;text-align:center}
+  .hidden{display:none}
+  #shopItems button{display:block;width:100%;margin:6px 0;padding:10px;font-size:18px}
 </style>
 </head>
 <body>
-<div class="hud">
-  <div class="panel">
-    <div>Lv:<span id="plv">1</span> HP:<span id="php">30</span>/<span id="pmax">30</span></div>
-    <div class="hpbar"><div id="phpfill" class="hpfill"></div></div>
-    <div>所持金:<span id="pgold">0</span>円</div>
+<!-- タイトル -->
+<div id="titleOverlay" class="overlay">
+  <div class="card">
+    <h1 style="margin:6px 0">NEO FIELD QUEST</h1>
+    <p>横持ち推奨。Aで開始。</p>
+    <button id="startBtn" class="btn A">はじめる</button>
   </div>
 </div>
 
-<canvas id="view" width="256" height="256"></canvas>
-<canvas id="minimap" width="128" height="128" style="position:fixed;top:10px;right:10px;border:1px solid #20ffe3"></canvas>
+<!-- HUD -->
+<div class="hud">
+  <div class="panel">
+    <div>Lv:<span id="plv">1</span> HP:<span id="php">30</span>/<span id="pmax">30</span></div>
+    <div class="hpbar"><div id="phpfill" class="hpfill" style="width:100%"></div></div>
+    <div>所持金:<span id="pgold">0</span>円　場所:<span id="place">草原</span></div>
+  </div>
+</div>
 
+<!-- メイン/ミニマップ -->
+<canvas id="view" width="256" height="256"></canvas>
+<canvas id="minimap" width="128" height="128" style="position:fixed;top:10px;right:10px;border:1px solid #20ffe3;border-radius:8px"></canvas>
+
+<!-- コントローラ -->
 <div class="controller">
   <div class="dpad">
     <div></div><button class="btn" data-dir="up">▲</button><div></div>
@@ -52,16 +63,16 @@ canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pi
   </div>
 </div>
 
-<!-- NPC吹き出し -->
-<div id="npcOverlay" class="overlay hidden">
+<!-- 城 -->
+<div id="castleOverlay" class="overlay hidden">
   <div class="card">
-    <h2 id="npcName">村人</h2>
-    <p id="npcLine"></p>
-    <button class="btn A" id="npcClose">閉じる</button>
+    <h2>王様</h2>
+    <p id="castleLine">よくぞ参った勇者よ。魔王を討ち、平和を取り戻してくれ！</p>
+    <button class="btn A" id="castleClose">閉じる</button>
   </div>
 </div>
 
-<!-- ショップUI -->
+<!-- ショップ -->
 <div id="shopOverlay" class="overlay hidden">
   <div class="card">
     <h2 id="shopTitle">ショップ</h2>
@@ -71,7 +82,16 @@ canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pi
   </div>
 </div>
 
-<!-- 戦闘UI -->
+<!-- 神殿（メッセのみ） -->
+<div id="templeOverlay" class="overlay hidden">
+  <div class="card">
+    <h2>神殿の巫女</h2>
+    <p id="templeText"></p>
+    <button class="btn A" id="templeOk">OK</button>
+  </div>
+</div>
+
+<!-- 戦闘 -->
 <div id="battleOverlay" class="overlay hidden">
   <div class="card">
     <h2 id="enemyName"></h2>
@@ -85,184 +105,236 @@ canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pi
 <div id="endingOverlay" class="overlay hidden">
   <div class="card">
     <h2>エンディング</h2>
-    <p id="endingText">平和がおとずれた…</p>
-    <button class="btn A" onclick="location.reload()">最初から</button>
+    <p id="endingText">勇者は魔王を倒し、世界に平和が戻った！</p>
+    <button class="btn A" onclick="location.reload()">もう一度</button>
   </div>
 </div>
 
 <script>
-(()=> {
+(()=>{
+// ===== util
 const $=id=>document.getElementById(id);
+let uiLocked=true;        // UIが開いている間の移動禁止
+let lastTile=null;        // 侵入デバウンス
+const rand=(n)=>Math.floor(Math.random()*n);
 
-// ====== Audio ======
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-const audioCtx = new AudioContext();
+// ===== Audio
+const AudioContext=window.AudioContext||window.webkitAudioContext;
+const audioCtx=new AudioContext();
 let bgmInterval=null;
-function playBeep(freq=440,duration=0.2,type="square",vol=0.2){
-  const osc=audioCtx.createOscillator();
-  const gain=audioCtx.createGain();
-  osc.type=type; osc.frequency.setValueAtTime(freq,audioCtx.currentTime);
-  gain.gain.setValueAtTime(vol,audioCtx.currentTime);
-  osc.connect(gain).connect(audioCtx.destination);
-  osc.start(); osc.stop(audioCtx.currentTime+duration);
+function playBeep(freq=440,dur=0.2,type="square",vol=0.2){
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type=type; o.frequency.value=freq; g.gain.value=vol;
+  o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+dur);
 }
-function sfxMove(){ playBeep(200,0.05,"square",0.1); }
-function sfxAttack(){ playBeep(600,0.1,"sawtooth",0.2); }
-function sfxDamage(){ playBeep(120,0.2,"triangle",0.2); }
-function sfxFanfare(){ playBeep(600,0.15,"square");setTimeout(()=>playBeep(800,0.15,"square"),200);setTimeout(()=>playBeep(1000,0.3,"square"),400); }
-function stopBGM(){ clearInterval(bgmInterval); bgmInterval=null; }
-function startFieldBGM(){ if(bgmInterval) return; const notes=[262,330,392,523]; let i=0; bgmInterval=setInterval(()=>{playBeep(notes[i%notes.length],0.25,"sine",0.05); i++;},500);}
-function startBattleBGM(){ if(bgmInterval) return; const notes=[220,262,294,330]; let i=0; bgmInterval=setInterval(()=>{playBeep(notes[i%notes.length],0.15,"square",0.08); i++;},250); }
+function sfxMove(){playBeep(200,0.05,"square",0.1)}
+function sfxAttack(){playBeep(600,0.1,"sawtooth",0.2)}
+function sfxDamage(){playBeep(120,0.2,"triangle",0.2)}
+function sfxFanfare(){playBeep(600,0.15);setTimeout(()=>playBeep(800,0.15),200);setTimeout(()=>playBeep(1000,0.3),400)}
+function stopBGM(){clearInterval(bgmInterval);bgmInterval=null}
+function startFieldBGM(){ if(bgmInterval) return; const notes=[262,330,392,523]; let i=0; bgmInterval=setInterval(()=>{playBeep(notes[i%notes.length],0.25,"sine",0.05);i++;},500)}
+function startBattleBGM(){ if(bgmInterval) return; const notes=[220,262,294,330]; let i=0; bgmInterval=setInterval(()=>{playBeep(notes[i%notes.length],0.15,"square",0.08);i++;},250)}
 
-// ====== マップ ======
+// ===== map
 const TILE=16,W=64,H=64;
 const T={GRASS:0,TOWN:1,CASTLE:2,CAVE:3,VILLAGE:4,TEMPLE:5,FOREST:6,RIVER:7};
-let map=[...Array(H)].map(()=>Array(W).fill(T.GRASS));
-for(let y=0;y<H;y++)for(let x=0;x<W;x++){ if(Math.random()<0.1)map[y][x]=T.FOREST; if(Math.random()<0.05)map[y][x]=T.RIVER;}
-map[5][5]=T.CASTLE; map[30][32]=T.CAVE; map[10][20]=T.TOWN; map[40][50]=T.VILLAGE; map[25][45]=T.TEMPLE;
+const map=[...Array(H)].map(()=>Array(W).fill(T.GRASS));
+// 地形
+for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  if(Math.random()<0.10) map[y][x]=T.FOREST;
+  if(Math.random()<0.04) map[y][x]=T.RIVER;
+}
+// 固定ランドマーク（ランダム後に上書き）
+map[5][58]=T.CASTLE;      // 右上付近：城
+map[30][32]=T.CAVE;       // 下中央：洞窟
+map[8][8]=T.TOWN;         // 左上：町
+map[10][20]=T.VILLAGE;    // その右：村
+map[12][26]=T.TEMPLE;     // 近く：神殿
 
-// ====== プレイヤー ======
-const player={x:2,y:2,hp:30,max:30,exp:0,gold:0,lv:1};
+const placeName=t=>{
+  switch(t){
+    case T.GRASS: return "草原";
+    case T.FOREST: return "森";
+    case T.RIVER: return "川";
+    case T.TOWN: return "町";
+    case T.VILLAGE: return "村";
+    case T.CASTLE: return "城";
+    case T.TEMPLE: return "神殿";
+    case T.CAVE: return "洞窟";
+  }
+}
+
+// ===== player
+const player={x:6,y:6,hp:30,max:30,lv:1,exp:0,gold:0};
+function updateHUD(){
+  $('plv').textContent=player.lv;
+  $('php').textContent=player.hp; $('pmax').textContent=player.max;
+  $('pgold').textContent=player.gold;
+  $('phpfill').style.width=(player.hp/player.max*100)+'%';
+  $('place').textContent=placeName(map[player.y][player.x]);
+}
+
+// ===== shops & temple
 let templeUsed=false;
-
-// ====== ショップデータ ======
 const shopData={
   town:{title:"町のショップ",items:[{name:"スイッチ２",price:40000},{name:"ポケカパック",price:200},{name:"父の油絵",price:300000}],noMoney:"恐れ入りますが、お金が足りませんわ",thanks:"ありがとうございます。またお越しくださいませ"},
   village:{title:"村の店",items:[{name:"きなこの餌",price:400},{name:"メロンのタネ",price:10},{name:"仙人マンの漫画セット",price:10000},{name:"鉄鉱石",price:1000}],noMoney:"お金が足りないじゃないか！おとといきやがれ",thanks:"へへへ、毎度あり"}
 };
-
-// ショップ表示
-function openShop(type){
-  const data=shopData[type];
-  $("shopTitle").textContent=data.title;
-  $("shopItems").innerHTML="";
-  data.items.forEach(item=>{
-    const btn=document.createElement("button");
-    btn.textContent=`${item.name} ${item.price}円`;
-    btn.onclick=()=>{
-      if(player.gold<item.price){
-        $("shopMsg").textContent=data.noMoney;
-      }else{
-        player.gold-=item.price;
-        $("pgold").textContent=player.gold;
-        $("shopMsg").textContent=data.thanks;
-      }
+function openShop(kind){
+  uiLocked=true;
+  const d=shopData[kind];
+  $('shopTitle').textContent=d.title;
+  $('shopItems').innerHTML='';
+  d.items.forEach(it=>{
+    const b=document.createElement('button'); b.className='btn A';
+    b.textContent=`${it.name}　${it.price}円`;
+    b.onclick=()=>{
+      if(player.gold<it.price){ $('shopMsg').textContent=d.noMoney; return; }
+      player.gold-=it.price; $('shopMsg').textContent=d.thanks; updateHUD();
     };
-    $("shopItems").appendChild(btn);
+    $('shopItems').appendChild(b);
   });
-  $("shopMsg").textContent="";
-  $("shopOverlay").classList.remove("hidden");
+  $('shopMsg').textContent='';
+  $('shopOverlay').classList.remove('hidden');
 }
-$("shopClose").onclick=()=>{ $("shopOverlay").classList.add("hidden"); };
+$('shopClose').onclick=()=>{ $('shopOverlay').classList.add('hidden'); uiLocked=false; };
 
-// ====== 神殿 ======
-function enterTemple(){
-  if(templeUsed){ alert("巫女: あなたにはもう力を授けられません"); return; }
-  player.lv++; player.max+=5; player.hp=player.max; templeUsed=true;
-  $("plv").textContent=player.lv; $("pmax").textContent=player.max; $("php").textContent=player.hp; $("phpfill").style.width="100%";
-  alert("巫女: あなたの力を少しだけ高めました。");
+function openCastle(){
+  uiLocked=true;
+  $('castleOverlay').classList.remove('hidden');
 }
+$('castleClose').onclick=()=>{ $('castleOverlay').classList.add('hidden'); uiLocked=false; };
 
-// ====== NPC ======
-const npcs=[{x:6,y:6,type:"town"},{x:56,y:21,type:"village"},{x:40,y:10,type:"field"}];
-const npcDialog={
-  town:["ようこそ、勇者様。この町は平和そのものです。","北に城があります。王様がお待ちですよ。"],
-  village:["おう、勇者！元気そうだな。","洞窟には近づくなよ。魔王がいるんだからな！"],
-  field:["旅は楽しいか？私は景色を眺めているだけで幸せさ。","森には珍しい魔物が出るぞ、気をつけな！"]
-};
-function talkToNPC(type){
-  let line="…",name="村人";
-  if(type==="town"){ line=npcDialog.town[Math.floor(Math.random()*npcDialog.town.length)]; name="町の村人"; }
-  else if(type==="village"){ line=npcDialog.village[Math.floor(Math.random()*npcDialog.village.length)]; name="村の村人"; }
-  else{ line=npcDialog.field[Math.floor(Math.random()*npcDialog.field.length)]; name="旅の人"; }
-  $("npcName").textContent=name; $("npcLine").textContent=line;
-  $("npcOverlay").classList.remove("hidden");
-}
-$("npcClose").onclick=()=>{ $("npcOverlay").classList.add("hidden"); };
-
-// ====== 戦闘 ======
-let enemy=null,bossBattle=false;
-const enemies=[{name:"スライム",hp:8,atk:3,exp:5,gold:5},{name:"仙人マン",hp:15,atk:5,exp:8,gold:10},{name:"はなくん",hp:20,atk:6,exp:10,gold:15},{name:"はぐれねこくん",hp:10,atk:10,exp:50,gold:100,rare:true},{name:"クルミっぽ",hp:12,atk:12,exp:60,gold:120,rare:true}];
-function startBattle(isBoss=false){
-  stopBGM(); startBattleBGM();
-  bossBattle=isBoss;
-  if(isBoss){ enemy={name:"魔王",hp:50,atk:12,exp:100,gold:300}; }
-  else{
-    let pool=enemies.slice(0,3); if(Math.random()<0.33) pool=pool.concat(enemies.slice(3));
-    enemy=JSON.parse(JSON.stringify(pool[Math.floor(Math.random()*pool.length)]));
+function openTemple(){
+  uiLocked=true;
+  if(templeUsed){
+    $('templeText').textContent='あなたにはもう力を授けられません';
+  }else{
+    player.lv++; player.max+=5; player.hp=player.max; templeUsed=true; updateHUD();
+    $('templeText').textContent='あなたの力を高めました（Lv+1）';
   }
-  $("enemyName").textContent=enemy.name; $("ehp").textContent=enemy.hp;
-  $("battleOverlay").classList.remove("hidden");
+  $('templeOverlay').classList.remove('hidden');
 }
-$("atkBtn").onclick=()=>{
-  sfxAttack(); enemy.hp-=5; if(enemy.hp<0)enemy.hp=0;
-  $("ehp").textContent=enemy.hp;
+$('templeOk').onclick=()=>{ $('templeOverlay').classList.add('hidden'); uiLocked=false; };
+
+// ===== battle
+let enemy=null, boss=false;
+const commons=[
+  {name:'スライム',hp:8,atk:[1,3],exp:5,gold:10},
+  {name:'仙人マン',hp:15,atk:[2,5],exp:8,gold:18},
+  {name:'はなくん',hp:20,atk:[3,6],exp:12,gold:25}
+];
+const rares=[
+  {name:'はぐれねこくん',hp:10,atk:[4,8],exp:40,gold:60},
+  {name:'クルミっぽ',hp:12,atk:[5,9],exp:50,gold:80}
+];
+function startBattle(isBoss=false){
+  boss=isBoss; stopBGM(); startBattleBGM(); uiLocked=true;
+  if(boss){ enemy={name:'魔王',hp:50,atk:[6,12],exp:120,gold:300}; }
+  else{
+    const pool=(Math.random()<0.33)?commons.concat(rares):commons;
+    const e=pool[rand(pool.length)]; enemy={...e};
+  }
+  $('enemyName').textContent=enemy.name; $('ehp').textContent=enemy.hp;
+  $('battleOverlay').classList.remove('hidden');
+}
+$('atkBtn').onclick=()=>{
+  sfxAttack();
+  const pdmg=5+rand(4); enemy.hp=Math.max(0,enemy.hp-pdmg); $('ehp').textContent=enemy.hp;
   if(enemy.hp<=0){
-    $("battleOverlay").classList.add("hidden");
-    player.exp+=enemy.exp; player.gold+=enemy.gold;
-    $("pgold").textContent=player.gold;
+    $('battleOverlay').classList.add('hidden'); uiLocked=false;
+    player.exp+=enemy.exp||0; player.gold+=enemy.gold||0; updateHUD();
     stopBGM(); startFieldBGM();
-    if(bossBattle) showEnding();
+    if(boss){ showEnding(); }
     return;
   }
-  setTimeout(()=>{
-    sfxDamage(); player.hp-=enemy.atk;
-    if(player.hp<=0){ alert("勇者は倒れた…"); location.reload(); }
-    $("php").textContent=player.hp; $("phpfill").style.width=(player.hp/player.max*100)+"%";
-  },500);
+  setTimeout(()=>{ // 反撃
+    const d=enemy.atk[0]+rand(enemy.atk[1]-enemy.atk[0]+1);
+    sfxDamage(); player.hp=Math.max(0,player.hp-d); updateHUD();
+    if(player.hp<=0){ alert('勇者は倒れた…'); location.reload(); }
+  },300);
 };
-$("runBtn").onclick=()=>{ if(bossBattle){ alert("逃げられない！"); return; }
-  $("battleOverlay").classList.add("hidden"); stopBGM(); startFieldBGM(); };
+$('runBtn').onclick=()=>{
+  if(boss){ alert('逃げられない！'); return; }
+  $('battleOverlay').classList.add('hidden'); uiLocked=false; stopBGM(); startFieldBGM();
+};
 
-// ====== エンディング ======
+// ===== ending
 function showEnding(){
   stopBGM(); sfxFanfare();
-  $("endingText").textContent="勇者は魔王を倒し、世界に平和が戻った！\n人々は歓喜し、王は勇者を讃えた！";
-  $("endingOverlay").classList.remove("hidden");
+  $('endingText').textContent='魔王は崩れ去り、世界に光が戻った。人々は歓喜し、王はあなたを讃えた。';
+  $('endingOverlay').classList.remove('hidden');
 }
 
-// ====== 描画 ======
-const view=$("view"),ctx=view.getContext("2d");
-const mini=$("minimap"),mctx=mini.getContext("2d");
+// ===== draw
+const view=$('view'), ctx=view.getContext('2d');
+const mini=$('minimap'), mctx=mini.getContext('2d');
 function draw(){
-  ctx.fillStyle="#000"; ctx.fillRect(0,0,view.width,view.height);
-  const half=8,cx=player.x,cy=player.y;
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,view.width,view.height);
+  const half=8, cx=player.x, cy=player.y;
   for(let dy=-half;dy<=half;dy++)for(let dx=-half;dx<=half;dx++){
-    const mx=cx+dx,my=cy+dy; if(mx<0||my<0||mx>=W||my>=H)continue;
-    let t=map[my][mx],emoji="";
-    if(t===T.TOWN)emoji="🏘️"; if(t===T.CASTLE)emoji="🏰"; if(t===T.CAVE)emoji="🕳️"; if(t===T.VILLAGE)emoji="🛖"; if(t===T.TEMPLE)emoji="🏛️"; if(t===T.FOREST)emoji="🌳";
-    const px=(dx+half)*TILE,py=(dy+half)*TILE; ctx.fillStyle="#1c1c1c";ctx.fillRect(px,py,TILE,TILE);
-    if(emoji) ctx.fillText(emoji,px+2,py+14);
+    const mx=cx+dx, my=cy+dy; if(mx<0||my<0||mx>=W||my>=H) continue;
+    const t=map[my][mx]; const px=(dx+half)*TILE, py=(dy+half)*TILE;
+    ctx.fillStyle = (t===T.RIVER?'#123aee':'#1b2430'); ctx.fillRect(px,py,TILE,TILE);
+    let e='';
+    if(t===T.FOREST) e='🌳';
+    if(t===T.TOWN)   e='🏘️';
+    if(t===T.VILLAGE)e='🛖';
+    if(t===T.CASTLE) e='🏰';
+    if(t===T.TEMPLE) e='🏛️';
+    if(t===T.CAVE)   e='🕳️';
+    if(e) ctx.fillText(e,px+2,py+14);
   }
-  ctx.fillText("🏃‍♂️‍➡️",half*TILE+2,half*TILE+14);
-  drawMiniMap();
+  ctx.fillText('🏃‍♂️‍➡️',half*TILE+2,half*TILE+14);
+  drawMini();
 }
-function drawMiniMap(){
-  const scale=2; mctx.fillStyle="#000";mctx.fillRect(0,0,mini.width,mini.height);
-  mctx.fillStyle="#fff"; [T.TOWN,T.CASTLE,T.CAVE,T.VILLAGE,T.TEMPLE].forEach(tt=>{
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){ if(map[y][x]===tt) mctx.fillRect(x*scale,y*scale,scale,scale); }
+function drawMini(){
+  const sc=2; mctx.fillStyle='#000'; mctx.fillRect(0,0,mini.width,mini.height);
+  mctx.fillStyle='#fff';
+  [T.TOWN,T.VILLAGE,T.CASTLE,T.TEMPLE,T.CAVE].forEach(tt=>{
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      if(map[y][x]===tt) mctx.fillRect(x*sc,y*sc,sc,sc);
+    }
   });
-  mctx.fillStyle="orange"; mctx.fillRect(player.x*scale,player.y*scale,scale,scale);
+  mctx.fillStyle='orange'; mctx.fillRect(player.x*sc,player.y*sc,sc,sc);
 }
 
-// ====== 移動 ======
+// ===== movement & tile entry
+function handleTileEntry(t){
+  if(t===lastTile) return; // 同じタイルで連続発火防止
+  lastTile=t;
+
+  // 施設イベント
+  if(t===T.TOWN){ openShop('town'); return; }
+  if(t===T.VILLAGE){ openShop('village'); return; }
+  if(t===T.CASTLE){ openCastle(); return; }
+  if(t===T.TEMPLE){ openTemple(); return; }
+  if(t===T.CAVE){ startBattle(true); return; }
+
+  // フィールドエンカ（森は高め）
+  if(t===T.GRASS && Math.random()<0.05) startBattle(false);
+  if(t===T.FOREST && Math.random()<0.08) startBattle(false);
+}
+
 function move(dx,dy){
-  const nx=player.x+dx,ny=player.y+dy;
-  if(nx<0||ny<0||nx>=W||ny>=H) return; if(map[ny][nx]===T.RIVER) return;
-  player.x=nx;player.y=ny; sfxMove();
-  $("php").textContent=player.hp; $("phpfill").style.width=(player.hp/player.max*100)+"%"; draw();
-  if(Math.random()<0.05 && ![T.TOWN,T.VILLAGE,T.CASTLE,T.TEMPLE].includes(map[ny][nx])) startBattle(false);
-  if(map[ny][nx]===T.CAVE) startBattle(true);
-  if(map[ny][nx]===T.TOWN) openShop("town");
-  if(map[ny][nx]===T.VILLAGE) openShop("village");
-  if(map[ny][nx]===T.TEMPLE) enterTemple();
+  if(uiLocked) return;
+  const nx=player.x+dx, ny=player.y+dy;
+  if(nx<0||ny<0||nx>=W||ny>=H) return;
+  if(map[ny][nx]===T.RIVER) return;
+  player.x=nx; player.y=ny; sfxMove(); updateHUD(); draw();
+  handleTileEntry(map[ny][nx]);
 }
-document.querySelectorAll(".dpad .btn").forEach(b=>{
-  b.onclick=()=>{const d=b.dataset.dir;if(d==="up")move(0,-1);if(d==="down")move(0,1);if(d==="left")move(-1,0);if(d==="right")move(1,0);}
-});
-$("btnA").onclick=()=>{ /* NPC会話(省略:配置済みNPCならtalkToNPC呼び出し可) */ };
 
-draw(); startFieldBGM();
+document.querySelectorAll('[data-dir]').forEach(b=>{
+  b.onclick=()=>{const d=b.dataset.dir; if(d==='up')move(0,-1); if(d==='down')move(0,1); if(d==='left')move(-1,0); if(d==='right')move(1,0);}
+});
+
+// ===== start
+$('startBtn').onclick=async ()=>{
+  await audioCtx.resume(); // iOS対策
+  $('titleOverlay').classList.add('hidden');
+  uiLocked=false; updateHUD(); draw(); startFieldBGM();
+};
 
 })();
 </script>
