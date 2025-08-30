@@ -2,15 +2,16 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>NEO FIELD QUEST</title>
 <style>
   body{margin:0;background:#0b0f14;color:#e5f1ff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;overflow:hidden}
-  canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pixelated}
+  canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pixelated;touch-action:none}
   .hud{display:flex;gap:12px;margin:8px}
   .panel{background:#0e1520aa;padding:8px 12px;border-radius:8px;border:1px solid #223545}
-  .hpbar{height:8px;background:#092231;border-radius:6px;overflow:hidden}
-  .hpfill{height:100%;background:linear-gradient(90deg,#20ffe3,#5df6ff)}
+  .hpbar,.mpbar{height:8px;border-radius:6px;overflow:hidden}
+  .hpbar{background:#092231}.hpfill{height:100%;background:linear-gradient(90deg,#20ffe3,#5df6ff)}
+  .mpbar{background:#0c1630;margin-top:4px}.mpfill{height:100%;background:linear-gradient(90deg,#8cc8ff,#4095ff)}
   .controller{position:fixed;bottom:20px;width:100%;display:flex;justify-content:space-between;padding:0 40px;pointer-events:none}
   .dpad,.buttons{pointer-events:auto}
   .dpad{display:grid;grid-template-columns:repeat(3,100px);grid-template-rows:repeat(3,100px);gap:8px}
@@ -24,9 +25,7 @@
   .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000c;z-index:5}
   .card{background:#08111b;border:2px solid #20ffe3;border-radius:12px;padding:20px;min-width:280px;text-align:center}
   .hidden{display:none}
-  #shopItems button{display:block;width:100%;margin:6px 0;padding:10px;font-size:18px}
-  #bagItems button{display:block;width:100%;margin:6px 0;padding:10px;font-size:18px}
-
+  #shopItems button,#bagItems button,#spellItems button{display:block;width:100%;margin:6px 0;padding:10px;font-size:18px}
   @media screen and (max-width:700px){
     canvas{width:90vw;height:90vw}
     .controller{flex-direction:column;align-items:center;gap:20px;padding:0 0 calc(env(safe-area-inset-bottom,0px)+20px)}
@@ -38,6 +37,7 @@
 </style>
 </head>
 <body>
+
 <!-- タイトル -->
 <div id="titleOverlay" class="overlay">
   <div class="card">
@@ -50,8 +50,9 @@
 <!-- HUD -->
 <div class="hud">
   <div class="panel">
-    <div>Lv:<span id="plv">1</span> HP:<span id="php">30</span>/<span id="pmax">30</span></div>
+    <div>Lv:<span id="plv">1</span> HP:<span id="php">30</span>/<span id="pmax">30</span> MP:<span id="pmp">10</span>/<span id="pmpmax">10</span></div>
     <div class="hpbar"><div id="phpfill" class="hpfill" style="width:100%"></div></div>
+    <div class="mpbar"><div id="pmpfill" class="mpfill" style="width:100%"></div></div>
     <div>所持金:<span id="pgold">0</span>円　場所:<span id="place">草原</span></div>
   </div>
 </div>
@@ -83,10 +84,11 @@
   </div>
 </div>
 
-<!-- ショップ -->
+<!-- ショップ/祠共通 -->
 <div id="shopOverlay" class="overlay hidden">
   <div class="card">
     <h2 id="shopTitle">ショップ</h2>
+    <div id="shopChar" style="font-size:40px;margin-bottom:8px;"></div>
     <div id="shopItems"></div>
     <p id="shopMsg"></p>
     <button class="btn B" id="shopClose">閉じる</button>
@@ -99,7 +101,7 @@
     <h2>持ち物</h2>
     <div id="bagItems"></div>
     <button class="btn B" id="bagBack">戻る</button>
-</div>
+  </div>
 </div>
 
 <!-- ステータス -->
@@ -116,8 +118,21 @@
   <div class="card">
     <h2 id="enemyName"></h2>
     <div>HP: <span id="ehp"></span></div>
-    <button class="btn A" id="atkBtn">攻撃</button>
-    <button class="btn B" id="runBtn">逃げる</button>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+      <button class="btn A" id="atkBtn">攻撃</button>
+      <button class="btn A" id="spellBtn">術</button>
+      <button class="btn B" id="runBtn">逃げる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 術選択 -->
+<div id="spellOverlay" class="overlay hidden">
+  <div class="card">
+    <h2>術を選ぶ</h2>
+    <div id="spellItems"></div>
+    <p id="spellMsg"></p>
+    <button class="btn B" id="spellClose">閉じる</button>
   </div>
 </div>
 
@@ -131,24 +146,25 @@
 </div>
 
 <script>
-document.addEventListener('touchstart',e=>{if(e.touches.length>1)e.preventDefault();},{passive:false});
-let lastTouchEnd=0;
-document.addEventListener('touchend',e=>{const now=Date.now();if(now-lastTouchEnd<=300)e.preventDefault();lastTouchEnd=now;},false);
+// ==== ズーム抑止（iOS対策）====
+window.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});
+window.addEventListener('gesturechange', e=>e.preventDefault(), {passive:false});
+window.addEventListener('gestureend', e=>e.preventDefault(), {passive:false});
+document.addEventListener('dblclick', e=>e.preventDefault(), {passive:false});
 
 (()=>{
 // ===== util
 const $=id=>document.getElementById(id);
-let uiLocked=true;        // UIが開いている間の移動禁止
-let lastTile=null;        // 侵入デバウンス
-const rand=(n)=>Math.floor(Math.random()*n);
-let steps=0;              // 累計移動マス
-const STEP_INTERVAL=10;   // この歩数ごとに敵出現（頻度アップ）
-const EXP_PER_LEVEL=20;   // レベルアップに必要な経験値増分
+let uiLocked=true;
+let lastTile=null;
+const rand=n=>Math.floor(Math.random()*n);
+let steps=0;
+const STEP_INTERVAL=10;
+const EXP_PER_LEVEL=20;
 
-// ===== Audio
+// ===== SFX（ビープ）
 const AudioContext=window.AudioContext||window.webkitAudioContext;
 const audioCtx=new AudioContext();
-let bgmInterval=null;
 function playBeep(freq=440,dur=0.2,type="square",vol=0.2){
   const o=audioCtx.createOscillator(), g=audioCtx.createGain();
   o.type=type; o.frequency.value=freq; g.gain.value=vol;
@@ -158,31 +174,46 @@ function sfxMove(){playBeep(200,0.05,"square",0.1)}
 function sfxAttack(){playBeep(600,0.1,"sawtooth",0.2)}
 function sfxDamage(){playBeep(120,0.2,"triangle",0.2)}
 function sfxFanfare(){playBeep(600,0.15);setTimeout(()=>playBeep(800,0.15),200);setTimeout(()=>playBeep(1000,0.3),400)}
-function stopBGM(){clearInterval(bgmInterval);bgmInterval=null}
-function startFieldBGM(){ if(bgmInterval) return; const notes=[262,330,392,523]; let i=0; bgmInterval=setInterval(()=>{playBeep(notes[i%notes.length],0.25,"sine",0.05);i++;},500)}
-function startBattleBGM(){ if(bgmInterval) return; const notes=[220,262,294,330]; let i=0; bgmInterval=setInterval(()=>{playBeep(notes[i%notes.length],0.15,"square",0.08);i++;},250)}
+
+// ===== BGM（mp3）
+const bgm = {
+  field: new Audio('audio/field.mp3'),
+  battle: new Audio('audio/batle.mp3'),
+  boss: new Audio('audio/boss.mp3'),
+};
+let currentBGM=null;
+for(const k in bgm){ bgm[k].loop=true; bgm[k].volume=0.6; }
+function stopBGM(){ if(currentBGM){ currentBGM.pause(); currentBGM=null; } }
+function playBGM(name){
+  stopBGM();
+  const a=bgm[name];
+  try{ a.currentTime=0; a.play(); }catch(_){}
+  currentBGM=a;
+}
+function startFieldBGM(){ playBGM('field'); }
+function startBattleBGM(){ playBGM('battle'); }
+function startBossBGM(){ playBGM('boss'); }
 
 // ===== map
 const TILE=16,W=64,H=64;
-const T={GRASS:0,TOWN:1,CASTLE:2,CAVE:3,VILLAGE:4,FOREST:5,RIVER:6};
+const T={GRASS:0,TOWN:1,CASTLE:2,CAVE:3,VILLAGE:4,FOREST:5,RIVER:6,SHRINE:7};
 const map=[...Array(H)].map(()=>Array(W).fill(T.GRASS));
-// 地形
+// ランダム地形
 for(let y=0;y<H;y++)for(let x=0;x<W;x++){
   if(Math.random()<0.10) map[y][x]=T.FOREST;
   if(Math.random()<0.04) map[y][x]=T.RIVER;
 }
-// 固定ランドマーク（ランダム後に上書き）
-map[5][58]=T.CASTLE;      // 右上付近：城
-map[50][6]=T.CASTLE;      // 左下付近：城
-map[25][25]=T.CASTLE;     // 中央：城
-map[30][32]=T.CAVE;       // 下中央：洞窟
-map[8][8]=T.TOWN;         // 左上：町
-map[10][20]=T.VILLAGE;    // その右：村
-map[20][45]=T.TOWN;       // 中央右：町
-map[55][40]=T.TOWN;       // 右下：町
-map[25][50]=T.VILLAGE;    // 中央右下：村
+// 固定ランドマーク
+map[5][58]=T.CASTLE; map[50][6]=T.CASTLE; map[25][25]=T.CASTLE;
+map[30][32]=T.CAVE;
+map[8][8]=T.TOWN; map[10][20]=T.VILLAGE; map[20][45]=T.TOWN; map[55][40]=T.TOWN; map[25][50]=T.VILLAGE;
+// 祠
+const dogShrine={x:15,y:15};
+const catShrine={x:45,y:45};
+map[dogShrine.y][dogShrine.x]=T.SHRINE;
+map[catShrine.y][catShrine.x]=T.SHRINE;
 
-const placeName=t=>{
+const placeName=(t,x=null,y=null)=>{
   switch(t){
     case T.GRASS: return "草原";
     case T.FOREST: return "森";
@@ -191,106 +222,104 @@ const placeName=t=>{
     case T.VILLAGE: return "村";
     case T.CASTLE: return "城";
     case T.CAVE: return "洞窟";
+    case T.SHRINE:
+      if(x!==null&&y!==null){
+        if(x===dogShrine.x && y===dogShrine.y) return "祠（犬神）";
+        if(x===catShrine.x && y===catShrine.y) return "祠（にゃんこガミ）";
+      }
+      return "祠";
   }
 }
 
 // ===== player
-const player={x:6,y:6,hp:30,max:30,lv:1,exp:0,gold:0,items:{potion:0}};
+const player={x:6,y:6,hp:30,max:30,mp:10,mpmax:10,lv:1,exp:0,gold:0,items:{potion:0},spells:[]};
 function updateHUD(){
   $('plv').textContent=player.lv;
   $('php').textContent=player.hp; $('pmax').textContent=player.max;
+  $('pmp').textContent=player.mp; $('pmpmax').textContent=player.mpmax;
   $('pgold').textContent=player.gold;
   $('phpfill').style.width=(player.hp/player.max*100)+'%';
-  $('place').textContent=placeName(map[player.y][player.x]);
+  $('pmpfill').style.width=(player.mp/player.mpmax*100)+'%';
+  $('place').textContent=placeName(map[player.y][player.x],player.x,player.y);
   if(!$('statusOverlay').classList.contains('hidden')) updateStatus();
 }
 
-// ===== shops
+// ===== shops / shrines
 const shopData={
-  town:{title:"町のショップ",items:[{name:"回復薬",price:30,item:"potion"},{name:"スイッチ２",price:40000},{name:"ポケカパック",price:200},{name:"父の油絵",price:300000}],noMoney:"恐れ入りますが、お金が足りませんわ",thanks:"ありがとうございます。またお越しくださいませ"},
-  village:{title:"村の店",items:[{name:"きなこの餌",price:400},{name:"メロンのタネ",price:10},{name:"仙人マンの漫画セット",price:10000},{name:"鉄鉱石",price:1000}],noMoney:"お金が足りないじゃないか！おとといきやがれ",thanks:"へへへ、毎度あり"}
+  town:{title:"町のショップ",char:"",items:[{name:"回復薬",price:30,item:"potion"},{name:"スイッチ２",price:40000},{name:"ポケカパック",price:200},{name:"父の油絵",price:300000}],noMoney:"恐れ入りますが、お金が足りませんわ",thanks:"ありがとうございます。またお越しくださいませ"},
+  village:{title:"村の店",char:"",items:[{name:"きなこの餌",price:400},{name:"メロンのタネ",price:10},{name:"仙人マンの漫画セット",price:10000},{name:"鉄鉱石",price:1000}],noMoney:"お金が足りないじゃないか！おとといきやがれ",thanks:"へへへ、毎度あり"},
+  dogShrine:{title:"犬神の祠",char:"🐕",isShrine:true,items:[
+    {name:"ボーボーの術",price:500,spell:{key:"bobo",name:"ボーボーの術",mp:3,type:"damage",power:20}},
+    {name:"ジュージューの術",price:5000,spell:{key:"juju",name:"ジュージューの術",mp:15,type:"damage",power:50}},
+    {name:"犬神になる術",price:50000,spell:{key:"doggod",name:"犬神になる術",mp:100,type:"damage",power:100}}
+  ],noMoney:"……金が足りない",thanks:"習得した。無駄撃ちはやめておきなさい"},
+  catShrine:{title:"にゃんこガミの祠",char:"🐈‍⬛",isShrine:true,items:[
+    {name:"ねこまた食べ食べ",price:1000,spell:{key:"nekotabe",name:"ねこまた食べ食べ",mp:5,type:"heal",power:20}},
+    {name:"甘噛み",price:2000,spell:{key:"amigami",name:"甘噛み",mp:3,type:"damage",power:1}},
+    {name:"ネズミ必殺",price:60000,spell:{key:"nezumi",name:"ネズミ必殺",mp:100,type:"randomHuge",power:200}}
+  ],noMoney:"足りないにゃ",thanks:"ありがとにゃ"}
 };
+
 function openShop(kind){
   uiLocked=true;
   const d=shopData[kind];
   $('shopTitle').textContent=d.title;
+  $('shopChar').textContent=d.char||"";
   $('shopItems').innerHTML='';
   d.items.forEach(it=>{
     const b=document.createElement('button'); b.className='btn A';
     b.textContent=`${it.name}　${it.price}円`;
-    b.onclick=()=>{
-      if(player.gold<it.price){ $('shopMsg').textContent=d.noMoney; return; }
-      player.gold-=it.price;
-      if(it.item){ player.items[it.item]=(player.items[it.item]||0)+1; }
-      $('shopMsg').textContent=d.thanks; updateHUD();
-    };
+    b.addEventListener('pointerdown', (e)=>{ e.preventDefault(); handleShopBuy(it,d); }, {passive:false});
+    b.addEventListener('click', (e)=>{ e.preventDefault(); handleShopBuy(it,d); }, {passive:false});
     $('shopItems').appendChild(b);
   });
   $('shopMsg').textContent='';
   $('shopOverlay').classList.remove('hidden');
 }
-$('shopClose').onclick=()=>{ $('shopOverlay').classList.add('hidden'); uiLocked=false; };
+function handleShopBuy(it,d){
+  if(player.gold<it.price){ $('shopMsg').textContent=d.noMoney; return; }
+  player.gold-=it.price;
+  if(it.item){ player.items[it.item]=(player.items[it.item]||0)+1; }
+  if(it.spell && !player.spells.find(s=>s.key===it.spell.key)){
+    player.spells.push({...it.spell});
+  }
+  $('shopMsg').textContent=d.thanks; updateHUD();
+}
+$('shopClose').addEventListener('pointerdown', e=>{ e.preventDefault(); $('shopOverlay').classList.add('hidden'); uiLocked=false; }, {passive:false});
+$('shopClose').addEventListener('click', e=>{ e.preventDefault(); $('shopOverlay').classList.add('hidden'); uiLocked=false; }, {passive:false});
 
 function updateBag(){
-  const div=$('bagItems');
-  div.innerHTML='';
+  const div=$('bagItems'); div.innerHTML='';
   const cnt=player.items.potion;
   if(cnt>0){
-    const b=document.createElement('button');
-    b.className='btn A';
-    b.textContent=`回復薬 x${cnt}`;
-    b.onclick=()=>{
-      if(player.items.potion>0){
-        player.items.potion--;
-        player.hp=Math.min(player.max,player.hp+20);
-        updateHUD();
-        updateBag();
-      }
-    };
+    const b=document.createElement('button'); b.className='btn A'; b.textContent=`回復薬 x${cnt}`;
+    const use=()=>{ if(player.items.potion>0){ player.items.potion--; player.hp=Math.min(player.max,player.hp+20); updateHUD(); updateBag(); } };
+    b.addEventListener('pointerdown', e=>{ e.preventDefault(); use(); }, {passive:false});
+    b.addEventListener('click', e=>{ e.preventDefault(); use(); }, {passive:false});
     div.appendChild(b);
   }else{
     div.textContent='何も持っていない';
   }
 }
-
-$('bagBtn').onclick=()=>{
-  const o=$('bagOverlay');
-  if(o.classList.contains('hidden')){
-    updateBag(); o.classList.remove('hidden'); uiLocked=true;
-  }else{
-    o.classList.add('hidden'); uiLocked=false;
-  }
-};
-
-// バッグ画面から戻る
-$('bagBack').onclick=()=>{
-  $('bagOverlay').classList.add('hidden');
-  uiLocked=false;
-};
+const toggleBag=()=>{ const o=$('bagOverlay'); if(o.classList.contains('hidden')){ updateBag(); o.classList.remove('hidden'); uiLocked=true; } else { o.classList.add('hidden'); uiLocked=false; } };
+$('bagBtn').addEventListener('pointerdown', e=>{ e.preventDefault(); toggleBag(); }, {passive:false});
+$('bagBtn').addEventListener('click', e=>{ e.preventDefault(); toggleBag(); }, {passive:false});
+$('bagBack').addEventListener('pointerdown', e=>{ e.preventDefault(); $('bagOverlay').classList.add('hidden'); uiLocked=false; }, {passive:false});
+$('bagBack').addEventListener('click', e=>{ e.preventDefault(); $('bagOverlay').classList.add('hidden'); uiLocked=false; }, {passive:false});
 
 function updateStatus(){
-  $('statusContent').innerHTML=`Lv:${player.lv}<br>HP:${player.hp}/${player.max}<br>経験値:${player.exp}/${player.lv*EXP_PER_LEVEL}<br>所持金:${player.gold}円`;
+  const spells = player.spells.length? player.spells.map(s=>s.name+`(MP${s.mp})`).join(', ') : 'なし';
+  $('statusContent').innerHTML=`Lv:${player.lv}<br>HP:${player.hp}/${player.max}<br>MP:${player.mp}/${player.mpmax}<br>経験値:${player.exp}/${player.lv*EXP_PER_LEVEL}<br>所持金:${player.gold}円<br>習得術:${spells}`;
 }
+const toggleStatus=()=>{ const o=$('statusOverlay'); if(o.classList.contains('hidden')){ updateStatus(); o.classList.remove('hidden'); uiLocked=true; } else { o.classList.add('hidden'); uiLocked=false; } };
+$('statusBtn').addEventListener('pointerdown', e=>{ e.preventDefault(); toggleStatus(); }, {passive:false});
+$('statusBtn').addEventListener('click', e=>{ e.preventDefault(); toggleStatus(); }, {passive:false});
+$('statusClose').addEventListener('pointerdown', e=>{ e.preventDefault(); $('statusOverlay').classList.add('hidden'); uiLocked=false; }, {passive:false});
+$('statusClose').addEventListener('click', e=>{ e.preventDefault(); $('statusOverlay').classList.add('hidden'); uiLocked=false; }, {passive:false});
 
-$('statusBtn').onclick=()=>{
-  const o=$('statusOverlay');
-  if(o.classList.contains('hidden')){
-    updateStatus(); o.classList.remove('hidden'); uiLocked=true;
-  }else{
-    o.classList.add('hidden'); uiLocked=false;
-  }
-};
-
-$('statusClose').onclick=()=>{
-  $('statusOverlay').classList.add('hidden');
-  uiLocked=false;
-};
-
-function openCastle(){
-  uiLocked=true;
-  $('castleOverlay').classList.remove('hidden');
-}
-$('castleClose').onclick=()=>{ $('castleOverlay').classList.add('hidden'); uiLocked=false; };
+function openCastle(){ uiLocked=true; $('castleOverlay').classList.remove('hidden'); }
+$('castleClose').addEventListener('pointerdown', e=>{ e.preventDefault(); $('castleOverlay').classList.add('hidden'); uiLocked=false; }, {passive:false});
+$('castleClose').addEventListener('click', e=>{ e.preventDefault(); $('castleOverlay').classList.add('hidden'); uiLocked=false; }, {passive:false});
 
 // ===== battle
 let enemy=null, boss=false;
@@ -304,47 +333,69 @@ const rares=[
   {name:'クルミっぽ',hp:12,atk:[5,9],exp:50,gold:80}
 ];
 function startBattle(isBoss=false){
-  boss=isBoss; stopBGM(); startBattleBGM(); uiLocked=true;
+  boss=isBoss; stopBGM(); boss? startBossBGM() : startBattleBGM(); uiLocked=true;
   if(boss){ enemy={name:'魔王',hp:50,atk:[6,12],exp:120,gold:300}; }
-  else{
-    const pool=(Math.random()<0.33)?commons.concat(rares):commons;
-    const e=pool[rand(pool.length)]; enemy={...e};
-  }
+  else{ const pool=(Math.random()<0.33)?commons.concat(rares):commons; enemy={...pool[rand(pool.length)]}; }
   $('enemyName').textContent=enemy.name; $('ehp').textContent=enemy.hp;
   $('battleOverlay').classList.remove('hidden');
 }
-$('atkBtn').onclick=()=>{
-  sfxAttack();
-  const pdmg=5+rand(4); enemy.hp=Math.max(0,enemy.hp-pdmg); $('ehp').textContent=enemy.hp;
-  if(enemy.hp<=0){
-    $('battleOverlay').classList.add('hidden'); uiLocked=false;
-    player.exp+=enemy.exp; player.gold+=enemy.gold||0;
-    if(player.exp>=player.lv*EXP_PER_LEVEL){
-      player.exp-=player.lv*EXP_PER_LEVEL;
-      player.lv++; player.max+=5; player.hp=player.max;
-    }
-    updateHUD();
-    stopBGM(); startFieldBGM();
-    if(boss){ showEnding(); }
-    return;
+function onEnemyDefeated(){
+  $('battleOverlay').classList.add('hidden'); uiLocked=false;
+  player.exp+=enemy.exp; player.gold+=enemy.gold||0;
+  if(player.exp>=player.lv*EXP_PER_LEVEL){
+    player.exp-=player.lv*EXP_PER_LEVEL;
+    player.lv++; player.max+=5; player.hp=player.max; player.mpmax+=3; player.mp=Math.min(player.mpmax, player.mp+player.mpmax);
   }
-  setTimeout(()=>{ // 反撃
-    const d=enemy.atk[0]+rand(enemy.atk[1]-enemy.atk[0]+1);
-    sfxDamage(); player.hp=Math.max(0,player.hp-d); updateHUD();
-    if(player.hp<=0){ alert('勇者は倒れた…'); location.reload(); }
-  },300);
-};
-$('runBtn').onclick=()=>{
-  if(boss){ alert('逃げられない！'); return; }
-  $('battleOverlay').classList.add('hidden'); uiLocked=false; stopBGM(); startFieldBGM();
-};
+  updateHUD();
+  stopBGM(); startFieldBGM();
+  if(boss){ showEnding(); }
+}
+function enemyCounter(){
+  setTimeout(()=>{ const d=enemy.atk[0]+rand(enemy.atk[1]-enemy.atk[0]+1); sfxDamage(); player.hp=Math.max(0,player.hp-d); updateHUD(); if(player.hp<=0){ alert('勇者は倒れた…'); location.reload(); } },300);
+}
+$('atkBtn').addEventListener('pointerdown', e=>{ e.preventDefault(); sfxAttack(); const pdmg=5+rand(4); enemy.hp=Math.max(0,enemy.hp-pdmg); $('ehp').textContent=enemy.hp; if(enemy.hp<=0){ onEnemyDefeated(); } else { enemyCounter(); } }, {passive:false});
+$('atkBtn').addEventListener('click', e=>{ e.preventDefault(); sfxAttack(); const pdmg=5+rand(4); enemy.hp=Math.max(0,enemy.hp-pdmg); $('ehp').textContent=enemy.hp; if(enemy.hp<=0){ onEnemyDefeated(); } else { enemyCounter(); } }, {passive:false});
+
+// 逃げる（ボス以外は必ず成功）
+function fleeHandler(e){ if(e) e.preventDefault(); if(boss){ alert('逃げられない！'); return; } $('battleOverlay').classList.add('hidden'); uiLocked=false; stopBGM(); startFieldBGM(); }
+$('runBtn').addEventListener('pointerdown', fleeHandler, {passive:false});
+$('runBtn').addEventListener('click', fleeHandler, {passive:false});
+
+// 術
+$('spellBtn').addEventListener('pointerdown', e=>{ e.preventDefault(); openSpell(); }, {passive:false});
+$('spellBtn').addEventListener('click', e=>{ e.preventDefault(); openSpell(); }, {passive:false});
+function openSpell(){ if(player.spells.length===0){ $('spellMsg').textContent='術を覚えていない'; $('spellOverlay').classList.remove('hidden'); return; } renderSpellList(); $('spellOverlay').classList.remove('hidden'); }
+function renderSpellList(){
+  const div=$('spellItems'); div.innerHTML='';
+  player.spells.forEach(sp=>{
+    const b=document.createElement('button'); b.className='btn A'; b.textContent=`${sp.name} (MP${sp.mp})`;
+    const use=()=>useSpell(sp);
+    b.addEventListener('pointerdown', e=>{ e.preventDefault(); use(); }, {passive:false});
+    b.addEventListener('click', e=>{ e.preventDefault(); use(); }, {passive:false});
+    div.appendChild(b);
+  });
+  $('spellMsg').textContent='';
+}
+$('spellClose').addEventListener('pointerdown', e=>{ e.preventDefault(); $('spellOverlay').classList.add('hidden'); }, {passive:false});
+$('spellClose').addEventListener('click', e=>{ e.preventDefault(); $('spellOverlay').classList.add('hidden'); }, {passive:false});
+
+function useSpell(sp){
+  if(player.mp<sp.mp){ $('spellMsg').textContent='MPが足りない'; return; }
+  player.mp-=sp.mp; updateHUD();
+  if(sp.type==='damage'){
+    sfxAttack(); enemy.hp=Math.max(0, enemy.hp - sp.power); $('ehp').textContent=enemy.hp;
+    if(enemy.hp<=0){ $('spellOverlay').classList.add('hidden'); onEnemyDefeated(); } else { $('spellOverlay').classList.add('hidden'); enemyCounter(); }
+  }else if(sp.type==='heal'){
+    player.hp=Math.min(player.max, player.hp + sp.power); updateHUD(); $('spellOverlay').classList.add('hidden'); enemyCounter();
+  }else if(sp.type==='randomHuge'){
+    const hit = Math.random()<0.5; const dmg = hit ? sp.power : 0; enemy.hp=Math.max(0, enemy.hp - dmg); $('ehp').textContent=enemy.hp;
+    $('spellMsg').textContent = hit? '会心のねこパンチ！' : '……外れた。';
+    setTimeout(()=>{ if(enemy.hp<=0){ $('spellOverlay').classList.add('hidden'); onEnemyDefeated(); } else { $('spellOverlay').classList.add('hidden'); enemyCounter(); } }, 400);
+  }
+}
 
 // ===== ending
-function showEnding(){
-  stopBGM(); sfxFanfare();
-  $('endingText').textContent='魔王は崩れ去り、世界に光が戻った。人々は歓喜し、王はあなたを讃えた。';
-  $('endingOverlay').classList.remove('hidden');
-}
+function showEnding(){ stopBGM(); sfxFanfare(); $('endingText').textContent='魔王は崩れ去り、世界に光が戻った。人々は歓喜し、王はあなたを讃えた。'; $('endingOverlay').classList.remove('hidden'); }
 
 // ===== draw
 const view=$('view'), ctx=view.getContext('2d');
@@ -362,6 +413,7 @@ function draw(){
     if(t===T.VILLAGE)e='🛖';
     if(t===T.CASTLE) e='🏰';
     if(t===T.CAVE)   e='🕳️';
+    if(t===T.SHRINE) e='⛩️';
     if(e) ctx.fillText(e,px+2,py+14);
   }
   ctx.fillText('🏃‍♂️‍➡️',half*TILE+2,half*TILE+14);
@@ -370,7 +422,7 @@ function draw(){
 function drawMini(){
   const sc=2; mctx.fillStyle='#000'; mctx.fillRect(0,0,mini.width,mini.height);
   mctx.fillStyle='#fff';
-  [T.TOWN,T.VILLAGE,T.CASTLE,T.CAVE].forEach(tt=>{
+  [T.TOWN,T.VILLAGE,T.CASTLE,T.CAVE,T.SHRINE].forEach(tt=>{
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){
       if(map[y][x]===tt) mctx.fillRect(x*sc,y*sc,sc,sc);
     }
@@ -378,40 +430,68 @@ function drawMini(){
   mctx.fillStyle='orange'; mctx.fillRect(player.x*sc,player.y*sc,sc,sc);
 }
 
-// ===== movement & tile entry
-function handleTileEntry(t){
-  if(t===lastTile) return; // 同じタイルで連続発火防止
-  lastTile=t;
+// ===== movement（D-Pad長押し対応）
+const pressed={up:false,down:false,left:false,right:false};
+function setDir(d,val){ pressed[d]=val; }
+document.querySelectorAll('[data-dir]').forEach(b=>{
+  b.addEventListener('pointerdown', e=>{ e.preventDefault(); setDir(b.dataset.dir,true); }, {passive:false});
+  b.addEventListener('pointerup', e=>{ e.preventDefault(); setDir(b.dataset.dir,false); }, {passive:false});
+  b.addEventListener('pointercancel', e=>{ e.preventDefault(); setDir(b.dataset.dir,false); }, {passive:false});
+  b.addEventListener('pointerout', e=>{ e.preventDefault(); setDir(b.dataset.dir,false); }, {passive:false});
+});
+let nextMoveTime=0; const MOVE_REPEAT=120;
+function gameLoop(ts){
+  if(ts>=nextMoveTime){
+    if(!uiLocked){
+      if(pressed.up) move(0,-1);
+      else if(pressed.down) move(0,1);
+      else if(pressed.left) move(-1,0);
+      else if(pressed.right) move(1,0);
+    }
+    nextMoveTime=ts+MOVE_REPEAT;
+  }
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
 
-  // 施設イベント
+// ===== movement & tile entry
+function handleTileEntry(t,x,y){
+  if(t===lastTile) return; lastTile=t;
   if(t===T.TOWN){ openShop('town'); return; }
   if(t===T.VILLAGE){ openShop('village'); return; }
   if(t===T.CASTLE){ openCastle(); return; }
   if(t===T.CAVE){ startBattle(true); return; }
-
-  // フィールドエンカ：一定歩数ごとに出現
+  if(t===T.SHRINE){
+    if(x===dogShrine.x && y===dogShrine.y){ openShop('dogShrine'); return; }
+    if(x===catShrine.x && y===catShrine.y){ openShop('catShrine'); return; }
+  }
   if((t===T.GRASS||t===T.FOREST) && steps%STEP_INTERVAL===0){ startBattle(false); return; }
 }
-
 function move(dx,dy){
   if(uiLocked) return;
   const nx=player.x+dx, ny=player.y+dy;
   if(nx<0||ny<0||nx>=W||ny>=H) return;
   if(map[ny][nx]===T.RIVER) return;
   player.x=nx; player.y=ny; steps++; sfxMove(); updateHUD(); draw();
-  handleTileEntry(map[ny][nx]);
+  handleTileEntry(map[ny][nx],nx,ny);
 }
 
-document.querySelectorAll('[data-dir]').forEach(b=>{
-  b.onclick=()=>{const d=b.dataset.dir; if(d==='up')move(0,-1); if(d==='down')move(0,1); if(d==='left')move(-1,0); if(d==='right')move(1,0);}
-});
-
 // ===== start
-$('startBtn').onclick=async ()=>{
-  await audioCtx.resume(); // iOS対策
+$('startBtn').addEventListener('pointerdown', async (e)=>{
+  e.preventDefault();
+  await audioCtx.resume();         // SFX用
+  // iOS向けにBGMをプライム
+  try{ for(const k in bgm){ await bgm[k].play(); bgm[k].pause(); } }catch(_){}
   $('titleOverlay').classList.add('hidden');
   uiLocked=false; updateHUD(); draw(); startFieldBGM();
-};
+}, {passive:false});
+$('startBtn').addEventListener('click', async (e)=>{
+  e.preventDefault(); // クリックでも開始できるように
+  await audioCtx.resume();
+  try{ for(const k in bgm){ await bgm[k].play(); bgm[k].pause(); } }catch(_){}
+  $('titleOverlay').classList.add('hidden');
+  uiLocked=false; updateHUD(); draw(); startFieldBGM();
+}, {passive:false});
 
 })();
 </script>
