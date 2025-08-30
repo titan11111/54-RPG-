@@ -69,7 +69,8 @@
   </div>
   <div class="buttons">
     <button class="btn A" id="btnA">決定</button>
-    <button class="btn B" id="bagBtn">バッグ</button>
+    <button class="btn B" id="statusBtn">ステータス</button>
+    <button class="btn B" id="bagBtn">持ち物</button>
   </div>
 </div>
 
@@ -92,12 +93,21 @@
   </div>
 </div>
 
-<!-- バッグ -->
+<!-- 持ち物 -->
 <div id="bagOverlay" class="overlay hidden">
   <div class="card">
-    <h2>バッグ</h2>
+    <h2>持ち物</h2>
     <div id="bagItems"></div>
-    <button class="btn B" id="bagBack">バック</button>
+    <button class="btn B" id="bagBack">戻る</button>
+</div>
+</div>
+
+<!-- ステータス -->
+<div id="statusOverlay" class="overlay hidden">
+  <div class="card">
+    <h2>ステータス</h2>
+    <div id="statusContent"></div>
+    <button class="btn B" id="statusClose">閉じる</button>
   </div>
 </div>
 
@@ -142,7 +152,7 @@ let lastTile=null;        // 侵入デバウンス
 const rand=(n)=>Math.floor(Math.random()*n);
 let steps=0;              // 累計移動マス
 let kills=0;              // 討伐数
-const STEP_INTERVAL=15;   // この歩数ごとに敵出現
+const STEP_INTERVAL=10;   // この歩数ごとに敵出現（頻度アップ）
 const KILLS_PER_LEVEL=10; // レベルアップに必要な討伐数増分
 
 // ===== Audio
@@ -266,6 +276,24 @@ $('bagBtn').onclick=()=>{
 // バッグ画面から戻る
 $('bagBack').onclick=()=>{
   $('bagOverlay').classList.add('hidden');
+  uiLocked=false;
+};
+
+function updateStatus(){
+  $('statusContent').innerHTML=`Lv:${player.lv}<br>HP:${player.hp}/${player.max}<br>所持金:${player.gold}円`;
+}
+
+$('statusBtn').onclick=()=>{
+  const o=$('statusOverlay');
+  if(o.classList.contains('hidden')){
+    updateStatus(); o.classList.remove('hidden'); uiLocked=true;
+  }else{
+    o.classList.add('hidden'); uiLocked=false;
+  }
+};
+
+$('statusClose').onclick=()=>{
+  $('statusOverlay').classList.add('hidden');
   uiLocked=false;
 };
 
