@@ -130,6 +130,10 @@ const $=id=>document.getElementById(id);
 let uiLocked=true;        // UIが開いている間の移動禁止
 let lastTile=null;        // 侵入デバウンス
 const rand=(n)=>Math.floor(Math.random()*n);
+let steps=0;              // 累計移動マス
+let kills=0;              // 討伐数
+const STEP_INTERVAL=15;   // この歩数ごとに敵出現
+const KILLS_PER_LEVEL=10; // レベルアップに必要な討伐数増分
 
 // ===== Audio
 const AudioContext=window.AudioContext||window.webkitAudioContext;
@@ -178,7 +182,7 @@ const placeName=t=>{
 }
 
 // ===== player
-const player={x:6,y:6,hp:30,max:30,lv:1,exp:0,gold:0};
+const player={x:6,y:6,hp:30,max:30,lv:1,gold:0};
 function updateHUD(){
   $('plv').textContent=player.lv;
   $('php').textContent=player.hp; $('pmax').textContent=player.max;
@@ -256,7 +260,11 @@ $('atkBtn').onclick=()=>{
   const pdmg=5+rand(4); enemy.hp=Math.max(0,enemy.hp-pdmg); $('ehp').textContent=enemy.hp;
   if(enemy.hp<=0){
     $('battleOverlay').classList.add('hidden'); uiLocked=false;
-    player.exp+=enemy.exp||0; player.gold+=enemy.gold||0; updateHUD();
+    kills++; player.gold+=enemy.gold||0;
+    if(kills>=player.lv*KILLS_PER_LEVEL){
+      player.lv++; player.max+=5; player.hp=player.max;
+    }
+    updateHUD();
     stopBGM(); startFieldBGM();
     if(boss){ showEnding(); }
     return;
@@ -324,9 +332,8 @@ function handleTileEntry(t){
   if(t===T.TEMPLE){ openTemple(); return; }
   if(t===T.CAVE){ startBattle(true); return; }
 
-  // フィールドエンカ（森は高め）
-  if(t===T.GRASS && Math.random()<0.05) startBattle(false);
-  if(t===T.FOREST && Math.random()<0.08) startBattle(false);
+  // フィールドエンカ：一定歩数ごとに出現
+  if((t===T.GRASS||t===T.FOREST) && steps%STEP_INTERVAL===0){ startBattle(false); return; }
 }
 
 function move(dx,dy){
@@ -334,7 +341,7 @@ function move(dx,dy){
   const nx=player.x+dx, ny=player.y+dy;
   if(nx<0||ny<0||nx>=W||ny>=H) return;
   if(map[ny][nx]===T.RIVER) return;
-  player.x=nx; player.y=ny; sfxMove(); updateHUD(); draw();
+  player.x=nx; player.y=ny; steps++; sfxMove(); updateHUD(); draw();
   handleTileEntry(map[ny][nx]);
 }
 
