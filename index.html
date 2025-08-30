@@ -25,6 +25,7 @@
   .card{background:#08111b;border:2px solid #20ffe3;border-radius:12px;padding:20px;min-width:280px;text-align:center}
   .hidden{display:none}
   #shopItems button{display:block;width:100%;margin:6px 0;padding:10px;font-size:18px}
+  #bagItems button{display:block;width:100%;margin:6px 0;padding:10px;font-size:18px}
 
   @media screen and (max-width:700px){
     canvas{width:90vw;height:90vw}
@@ -68,7 +69,7 @@
   </div>
   <div class="buttons">
     <button class="btn A" id="btnA">決定</button>
-    <button class="btn B" id="btnB">ステータス</button>
+    <button class="btn B" id="bagBtn">バッグ</button>
   </div>
 </div>
 
@@ -88,6 +89,14 @@
     <div id="shopItems"></div>
     <p id="shopMsg"></p>
     <button class="btn B" id="shopClose">閉じる</button>
+  </div>
+</div>
+
+<!-- バッグ -->
+<div id="bagOverlay" class="overlay hidden">
+  <div class="card">
+    <h2>バッグ</h2>
+    <div id="bagItems"></div>
   </div>
 </div>
 
@@ -184,7 +193,7 @@ const placeName=t=>{
 }
 
 // ===== player
-const player={x:6,y:6,hp:30,max:30,lv:1,gold:0};
+const player={x:6,y:6,hp:30,max:30,lv:1,gold:0,items:{potion:0}};
 function updateHUD(){
   $('plv').textContent=player.lv;
   $('php').textContent=player.hp; $('pmax').textContent=player.max;
@@ -196,7 +205,7 @@ function updateHUD(){
 // ===== shops & temple
 const usedTemples=new Set();
 const shopData={
-  town:{title:"町のショップ",items:[{name:"スイッチ２",price:40000},{name:"ポケカパック",price:200},{name:"父の油絵",price:300000}],noMoney:"恐れ入りますが、お金が足りませんわ",thanks:"ありがとうございます。またお越しくださいませ"},
+  town:{title:"町のショップ",items:[{name:"回復薬",price:30,item:"potion"},{name:"スイッチ２",price:40000},{name:"ポケカパック",price:200},{name:"父の油絵",price:300000}],noMoney:"恐れ入りますが、お金が足りませんわ",thanks:"ありがとうございます。またお越しくださいませ"},
   village:{title:"村の店",items:[{name:"きなこの餌",price:400},{name:"メロンのタネ",price:10},{name:"仙人マンの漫画セット",price:10000},{name:"鉄鉱石",price:1000}],noMoney:"お金が足りないじゃないか！おとといきやがれ",thanks:"へへへ、毎度あり"}
 };
 function openShop(kind){
@@ -209,7 +218,9 @@ function openShop(kind){
     b.textContent=`${it.name}　${it.price}円`;
     b.onclick=()=>{
       if(player.gold<it.price){ $('shopMsg').textContent=d.noMoney; return; }
-      player.gold-=it.price; $('shopMsg').textContent=d.thanks; updateHUD();
+      player.gold-=it.price;
+      if(it.item){ player.items[it.item]=(player.items[it.item]||0)+1; }
+      $('shopMsg').textContent=d.thanks; updateHUD();
     };
     $('shopItems').appendChild(b);
   });
@@ -217,6 +228,37 @@ function openShop(kind){
   $('shopOverlay').classList.remove('hidden');
 }
 $('shopClose').onclick=()=>{ $('shopOverlay').classList.add('hidden'); uiLocked=false; };
+
+function updateBag(){
+  const div=$('bagItems');
+  div.innerHTML='';
+  const cnt=player.items.potion;
+  if(cnt>0){
+    const b=document.createElement('button');
+    b.className='btn A';
+    b.textContent=`回復薬 x${cnt}`;
+    b.onclick=()=>{
+      if(player.items.potion>0){
+        player.items.potion--;
+        player.hp=Math.min(player.max,player.hp+20);
+        updateHUD();
+        updateBag();
+      }
+    };
+    div.appendChild(b);
+  }else{
+    div.textContent='何も持っていない';
+  }
+}
+
+$('bagBtn').onclick=()=>{
+  const o=$('bagOverlay');
+  if(o.classList.contains('hidden')){
+    updateBag(); o.classList.remove('hidden'); uiLocked=true;
+  }else{
+    o.classList.add('hidden'); uiLocked=false;
+  }
+};
 
 function openCastle(){
   uiLocked=true;
