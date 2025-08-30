@@ -167,6 +167,8 @@ map[30][32]=T.CAVE;       // 下中央：洞窟
 map[8][8]=T.TOWN;         // 左上：町
 map[10][20]=T.VILLAGE;    // その右：村
 map[12][26]=T.TEMPLE;     // 近く：神殿
+map[40][10]=T.TEMPLE;     // 左下：神殿
+map[30][52]=T.TEMPLE;     // 右下：神殿
 
 const placeName=t=>{
   switch(t){
@@ -192,7 +194,7 @@ function updateHUD(){
 }
 
 // ===== shops & temple
-let templeUsed=false;
+const usedTemples=new Set();
 const shopData={
   town:{title:"町のショップ",items:[{name:"スイッチ２",price:40000},{name:"ポケカパック",price:200},{name:"父の油絵",price:300000}],noMoney:"恐れ入りますが、お金が足りませんわ",thanks:"ありがとうございます。またお越しくださいませ"},
   village:{title:"村の店",items:[{name:"きなこの餌",price:400},{name:"メロンのタネ",price:10},{name:"仙人マンの漫画セット",price:10000},{name:"鉄鉱石",price:1000}],noMoney:"お金が足りないじゃないか！おとといきやがれ",thanks:"へへへ、毎度あり"}
@@ -222,12 +224,13 @@ function openCastle(){
 }
 $('castleClose').onclick=()=>{ $('castleOverlay').classList.add('hidden'); uiLocked=false; };
 
-function openTemple(){
+function openTemple(y,x){
   uiLocked=true;
-  if(templeUsed){
+  const key=`${y},${x}`;
+  if(usedTemples.has(key)){
     $('templeText').textContent='あなたにはもう力を授けられません';
   }else{
-    player.lv++; player.max+=5; player.hp=player.max; templeUsed=true; updateHUD();
+    player.lv++; player.max+=5; player.hp=player.max; usedTemples.add(key); updateHUD();
     $('templeText').textContent='あなたの力を高めました（Lv+1）';
   }
   $('templeOverlay').classList.remove('hidden');
@@ -329,7 +332,7 @@ function handleTileEntry(t){
   if(t===T.TOWN){ openShop('town'); return; }
   if(t===T.VILLAGE){ openShop('village'); return; }
   if(t===T.CASTLE){ openCastle(); return; }
-  if(t===T.TEMPLE){ openTemple(); return; }
+  if(t===T.TEMPLE){ openTemple(player.y,player.x); return; }
   if(t===T.CAVE){ startBattle(true); return; }
 
   // フィールドエンカ：一定歩数ごとに出現
