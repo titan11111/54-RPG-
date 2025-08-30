@@ -22,17 +22,18 @@ canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pi
 .A{border-color:#20ffe3;color:#20ffe3}
 .B{border-color:#ff4dcb;color:#ff4dcb}
 .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000c;z-index:5}
-.card{background:#08111b;border:2px solid #20ffe3;border-radius:12px;padding:20px;min-width:260px;text-align:center}
+.card{background:#08111b;border:2px solid #20ffe3;border-radius:12px;padding:20px;min-width:280px;text-align:center}
 .hidden{display:none}
 #npcOverlay .card{ text-align:left; font-size:18px; line-height:1.6em; max-width:420px }
+#shopItems button{display:block;width:100%;margin:5px 0;padding:10px;font-size:18px}
 </style>
 </head>
 <body>
 <div class="hud">
   <div class="panel">
-    <div>HP: <span id="php">30</span>/<span id="pmax">30</span></div>
+    <div>Lv:<span id="plv">1</span> HP:<span id="php">30</span>/<span id="pmax">30</span></div>
     <div class="hpbar"><div id="phpfill" class="hpfill"></div></div>
-    <div>場所: <span id="place">草原</span></div>
+    <div>所持金:<span id="pgold">0</span>円</div>
   </div>
 </div>
 
@@ -51,7 +52,7 @@ canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pi
   </div>
 </div>
 
-<!-- NPC吹き出しUI -->
+<!-- NPC吹き出し -->
 <div id="npcOverlay" class="overlay hidden">
   <div class="card">
     <h2 id="npcName">村人</h2>
@@ -60,200 +61,208 @@ canvas{border:2px solid #20ffe3;border-radius:12px;margin:8px;image-rendering:pi
   </div>
 </div>
 
+<!-- ショップUI -->
+<div id="shopOverlay" class="overlay hidden">
+  <div class="card">
+    <h2 id="shopTitle">ショップ</h2>
+    <div id="shopItems"></div>
+    <p id="shopMsg"></p>
+    <button class="btn B" id="shopClose">閉じる</button>
+  </div>
+</div>
+
+<!-- 戦闘UI -->
+<div id="battleOverlay" class="overlay hidden">
+  <div class="card">
+    <h2 id="enemyName"></h2>
+    <div>HP: <span id="ehp"></span></div>
+    <button class="btn A" id="atkBtn">攻撃</button>
+    <button class="btn B" id="runBtn">逃げる</button>
+  </div>
+</div>
+
+<!-- エンディング -->
+<div id="endingOverlay" class="overlay hidden">
+  <div class="card">
+    <h2>エンディング</h2>
+    <p id="endingText">平和がおとずれた…</p>
+    <button class="btn A" onclick="location.reload()">最初から</button>
+  </div>
+</div>
+
 <script>
 (()=> {
-// ========== ユーティリティ ==========
 const $=id=>document.getElementById(id);
 
-// ========== Audio ==========
+// ====== Audio ======
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioCtx = new AudioContext();
 let bgmInterval=null;
-
-function playBeep(freq=440, duration=0.2, type="square", vol=0.2){
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+function playBeep(freq=440,duration=0.2,type="square",vol=0.2){
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+  osc.type=type; osc.frequency.setValueAtTime(freq,audioCtx.currentTime);
+  gain.gain.setValueAtTime(vol,audioCtx.currentTime);
   osc.connect(gain).connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime + duration);
+  osc.start(); osc.stop(audioCtx.currentTime+duration);
 }
 function sfxMove(){ playBeep(200,0.05,"square",0.1); }
 function sfxAttack(){ playBeep(600,0.1,"sawtooth",0.2); }
 function sfxDamage(){ playBeep(120,0.2,"triangle",0.2); }
-function sfxHeal(){ playBeep(800,0.15,"sine",0.2); }
-function sfxFanfare(){
-  playBeep(600,0.15,"square");
-  setTimeout(()=>playBeep(800,0.15,"square"),200);
-  setTimeout(()=>playBeep(1000,0.3,"square"),400);
-}
+function sfxFanfare(){ playBeep(600,0.15,"square");setTimeout(()=>playBeep(800,0.15,"square"),200);setTimeout(()=>playBeep(1000,0.3,"square"),400); }
 function stopBGM(){ clearInterval(bgmInterval); bgmInterval=null; }
-function startFieldBGM(){
-  if(bgmInterval) return;
-  const notes=[262,330,392,523];
-  let i=0;
-  bgmInterval=setInterval(()=>{
-    playBeep(notes[i%notes.length],0.25,"sine",0.05);
-    i++;
-  },500);
-}
-function startBattleBGM(){
-  if(bgmInterval) return;
-  const notes=[220,262,294,330];
-  let i=0;
-  bgmInterval=setInterval(()=>{
-    playBeep(notes[i%notes.length],0.15,"square",0.08);
-    i++;
-  },250);
-}
+function startFieldBGM(){ if(bgmInterval) return; const notes=[262,330,392,523]; let i=0; bgmInterval=setInterval(()=>{playBeep(notes[i%notes.length],0.25,"sine",0.05); i++;},500);}
+function startBattleBGM(){ if(bgmInterval) return; const notes=[220,262,294,330]; let i=0; bgmInterval=setInterval(()=>{playBeep(notes[i%notes.length],0.15,"square",0.08); i++;},250); }
 
-// ========== マップ/プレイヤー ==========
-const TILE=16, W=64, H=64;
+// ====== マップ ======
+const TILE=16,W=64,H=64;
 const T={GRASS:0,TOWN:1,CASTLE:2,CAVE:3,VILLAGE:4,TEMPLE:5,FOREST:6,RIVER:7};
 let map=[...Array(H)].map(()=>Array(W).fill(T.GRASS));
-for(let y=0;y<H;y++){
-  for(let x=0;x<W;x++){
-    if(Math.random()<0.1) map[y][x]=T.FOREST;
-    if(Math.random()<0.05) map[y][x]=T.RIVER;
-  }
+for(let y=0;y<H;y++)for(let x=0;x<W;x++){ if(Math.random()<0.1)map[y][x]=T.FOREST; if(Math.random()<0.05)map[y][x]=T.RIVER;}
+map[5][5]=T.CASTLE; map[30][32]=T.CAVE; map[10][20]=T.TOWN; map[40][50]=T.VILLAGE; map[25][45]=T.TEMPLE;
+
+// ====== プレイヤー ======
+const player={x:2,y:2,hp:30,max:30,exp:0,gold:0,lv:1};
+let templeUsed=false;
+
+// ====== ショップデータ ======
+const shopData={
+  town:{title:"町のショップ",items:[{name:"スイッチ２",price:40000},{name:"ポケカパック",price:200},{name:"父の油絵",price:300000}],noMoney:"恐れ入りますが、お金が足りませんわ",thanks:"ありがとうございます。またお越しくださいませ"},
+  village:{title:"村の店",items:[{name:"きなこの餌",price:400},{name:"メロンのタネ",price:10},{name:"仙人マンの漫画セット",price:10000},{name:"鉄鉱石",price:1000}],noMoney:"お金が足りないじゃないか！おとといきやがれ",thanks:"へへへ、毎度あり"}
+};
+
+// ショップ表示
+function openShop(type){
+  const data=shopData[type];
+  $("shopTitle").textContent=data.title;
+  $("shopItems").innerHTML="";
+  data.items.forEach(item=>{
+    const btn=document.createElement("button");
+    btn.textContent=`${item.name} ${item.price}円`;
+    btn.onclick=()=>{
+      if(player.gold<item.price){
+        $("shopMsg").textContent=data.noMoney;
+      }else{
+        player.gold-=item.price;
+        $("pgold").textContent=player.gold;
+        $("shopMsg").textContent=data.thanks;
+      }
+    };
+    $("shopItems").appendChild(btn);
+  });
+  $("shopMsg").textContent="";
+  $("shopOverlay").classList.remove("hidden");
 }
-map[5][5]=T.CASTLE; map[30][32]=T.CAVE; map[10][20]=T.TOWN;
-map[40][50]=T.VILLAGE; map[25][45]=T.TEMPLE;
+$("shopClose").onclick=()=>{ $("shopOverlay").classList.add("hidden"); };
 
-const player={x:2,y:2,hp:30,max:30};
+// ====== 神殿 ======
+function enterTemple(){
+  if(templeUsed){ alert("巫女: あなたにはもう力を授けられません"); return; }
+  player.lv++; player.max+=5; player.hp=player.max; templeUsed=true;
+  $("plv").textContent=player.lv; $("pmax").textContent=player.max; $("php").textContent=player.hp; $("phpfill").style.width="100%";
+  alert("巫女: あなたの力を少しだけ高めました。");
+}
 
-// ========== NPC ==========
-const npcs=[
-  {x:6,y:6,type:"town"},
-  {x:56,y:21,type:"village"},
-  {x:40,y:10,type:"field"}
-];
+// ====== NPC ======
+const npcs=[{x:6,y:6,type:"town"},{x:56,y:21,type:"village"},{x:40,y:10,type:"field"}];
 const npcDialog={
-  town:[
-    "ようこそ、勇者様。この町は平和そのものです。",
-    "北に城があります。王様がお待ちですよ。"
-  ],
-  village:[
-    "おう、勇者！元気そうだな。",
-    "洞窟には近づくなよ。魔王がいるんだからな！"
-  ],
-  field:[
-    "旅は楽しいか？私は景色を眺めているだけで幸せさ。",
-    "森には珍しい魔物が出るぞ、気をつけな！"
-  ]
+  town:["ようこそ、勇者様。この町は平和そのものです。","北に城があります。王様がお待ちですよ。"],
+  village:["おう、勇者！元気そうだな。","洞窟には近づくなよ。魔王がいるんだからな！"],
+  field:["旅は楽しいか？私は景色を眺めているだけで幸せさ。","森には珍しい魔物が出るぞ、気をつけな！"]
 };
 function talkToNPC(type){
-  let line="…", name="村人";
+  let line="…",name="村人";
   if(type==="town"){ line=npcDialog.town[Math.floor(Math.random()*npcDialog.town.length)]; name="町の村人"; }
   else if(type==="village"){ line=npcDialog.village[Math.floor(Math.random()*npcDialog.village.length)]; name="村の村人"; }
   else{ line=npcDialog.field[Math.floor(Math.random()*npcDialog.field.length)]; name="旅の人"; }
-  $("npcName").textContent=name;
-  $("npcLine").textContent=line;
+  $("npcName").textContent=name; $("npcLine").textContent=line;
   $("npcOverlay").classList.remove("hidden");
 }
 $("npcClose").onclick=()=>{ $("npcOverlay").classList.add("hidden"); };
 
-// NPCをランダムに動かす
-function moveNPCs(){
-  for(const npc of npcs){
-    if(Math.random()<0.5) continue;
-    const dir=[[1,0],[-1,0],[0,1],[0,-1]][Math.floor(Math.random()*4)];
-    const nx=npc.x+dir[0], ny=npc.y+dir[1];
-    if(nx<0||ny<0||nx>=W||ny>=H) continue;
-    if(map[ny][nx]===T.RIVER) continue;
-    npc.x=nx; npc.y=ny;
+// ====== 戦闘 ======
+let enemy=null,bossBattle=false;
+const enemies=[{name:"スライム",hp:8,atk:3,exp:5,gold:5},{name:"仙人マン",hp:15,atk:5,exp:8,gold:10},{name:"はなくん",hp:20,atk:6,exp:10,gold:15},{name:"はぐれねこくん",hp:10,atk:10,exp:50,gold:100,rare:true},{name:"クルミっぽ",hp:12,atk:12,exp:60,gold:120,rare:true}];
+function startBattle(isBoss=false){
+  stopBGM(); startBattleBGM();
+  bossBattle=isBoss;
+  if(isBoss){ enemy={name:"魔王",hp:50,atk:12,exp:100,gold:300}; }
+  else{
+    let pool=enemies.slice(0,3); if(Math.random()<0.33) pool=pool.concat(enemies.slice(3));
+    enemy=JSON.parse(JSON.stringify(pool[Math.floor(Math.random()*pool.length)]));
   }
-  draw();
+  $("enemyName").textContent=enemy.name; $("ehp").textContent=enemy.hp;
+  $("battleOverlay").classList.remove("hidden");
 }
-setInterval(moveNPCs,1000);
+$("atkBtn").onclick=()=>{
+  sfxAttack(); enemy.hp-=5; if(enemy.hp<0)enemy.hp=0;
+  $("ehp").textContent=enemy.hp;
+  if(enemy.hp<=0){
+    $("battleOverlay").classList.add("hidden");
+    player.exp+=enemy.exp; player.gold+=enemy.gold;
+    $("pgold").textContent=player.gold;
+    stopBGM(); startFieldBGM();
+    if(bossBattle) showEnding();
+    return;
+  }
+  setTimeout(()=>{
+    sfxDamage(); player.hp-=enemy.atk;
+    if(player.hp<=0){ alert("勇者は倒れた…"); location.reload(); }
+    $("php").textContent=player.hp; $("phpfill").style.width=(player.hp/player.max*100)+"%";
+  },500);
+};
+$("runBtn").onclick=()=>{ if(bossBattle){ alert("逃げられない！"); return; }
+  $("battleOverlay").classList.add("hidden"); stopBGM(); startFieldBGM(); };
 
-// ========== 描画 ==========
+// ====== エンディング ======
+function showEnding(){
+  stopBGM(); sfxFanfare();
+  $("endingText").textContent="勇者は魔王を倒し、世界に平和が戻った！\n人々は歓喜し、王は勇者を讃えた！";
+  $("endingOverlay").classList.remove("hidden");
+}
+
+// ====== 描画 ======
 const view=$("view"),ctx=view.getContext("2d");
 const mini=$("minimap"),mctx=mini.getContext("2d");
-
 function draw(){
-  ctx.fillStyle="#000";ctx.fillRect(0,0,view.width,view.height);
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,view.width,view.height);
   const half=8,cx=player.x,cy=player.y;
-  for(let dy=-half;dy<=half;dy++){
-    for(let dx=-half;dx<=half;dx++){
-      const mx=cx+dx,my=cy+dy;
-      if(mx<0||my<0||mx>=W||my>=H) continue;
-      let t=map[my][mx],emoji="";
-      if(t===T.TOWN) emoji="🏘️";
-      if(t===T.CASTLE) emoji="🏰";
-      if(t===T.CAVE) emoji="🕳️";
-      if(t===T.VILLAGE) emoji="🛖";
-      if(t===T.TEMPLE) emoji="🏛️";
-      if(t===T.FOREST) emoji="🌳";
-      const px=(dx+half)*TILE,py=(dy+half)*TILE;
-      ctx.fillStyle="#1c1c1c";ctx.fillRect(px,py,TILE,TILE);
-      if(emoji) ctx.fillText(emoji,px+2,py+14);
-    }
+  for(let dy=-half;dy<=half;dy++)for(let dx=-half;dx<=half;dx++){
+    const mx=cx+dx,my=cy+dy; if(mx<0||my<0||mx>=W||my>=H)continue;
+    let t=map[my][mx],emoji="";
+    if(t===T.TOWN)emoji="🏘️"; if(t===T.CASTLE)emoji="🏰"; if(t===T.CAVE)emoji="🕳️"; if(t===T.VILLAGE)emoji="🛖"; if(t===T.TEMPLE)emoji="🏛️"; if(t===T.FOREST)emoji="🌳";
+    const px=(dx+half)*TILE,py=(dy+half)*TILE; ctx.fillStyle="#1c1c1c";ctx.fillRect(px,py,TILE,TILE);
+    if(emoji) ctx.fillText(emoji,px+2,py+14);
   }
   ctx.fillText("🏃‍♂️‍➡️",half*TILE+2,half*TILE+14);
-
-  // NPC描画
-  for(const npc of npcs){
-    let emoji="👤";
-    if(npc.type==="town") emoji="👨";
-    if(npc.type==="village") emoji="👩";
-    if(npc.type==="field") emoji="🧙‍♂️";
-    const px=(npc.x-cx+half)*TILE, py=(npc.y-cy+half)*TILE;
-    if(px>=0&&py>=0&&px<view.width&&py<view.height){
-      ctx.fillText(emoji,px+2,py+14);
-    }
-  }
-
   drawMiniMap();
 }
 function drawMiniMap(){
-  const scale=2;
-  mctx.fillStyle="#000";mctx.fillRect(0,0,mini.width,mini.height);
-  for(let y=0;y<H;y++){
-    for(let x=0;x<W;x++){
-      const t=map[y][x];
-      if(t===T.RIVER){ mctx.fillStyle="#2048ff"; }
-      else if(t===T.FOREST){ mctx.fillStyle="#0a3"; }
-      else if(t!==T.GRASS){ mctx.fillStyle="#888"; }
-      else continue;
-      mctx.fillRect(x*scale,y*scale,scale,scale);
-    }
-  }
-  mctx.fillStyle="#fff";
-  [T.TOWN,T.CASTLE,T.CAVE,T.VILLAGE,T.TEMPLE].forEach(tt=>{
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-      if(map[y][x]===tt) mctx.fillRect(x*scale,y*scale,scale,scale);
-    }
+  const scale=2; mctx.fillStyle="#000";mctx.fillRect(0,0,mini.width,mini.height);
+  mctx.fillStyle="#fff"; [T.TOWN,T.CASTLE,T.CAVE,T.VILLAGE,T.TEMPLE].forEach(tt=>{
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){ if(map[y][x]===tt) mctx.fillRect(x*scale,y*scale,scale,scale); }
   });
-  mctx.fillStyle="orange";
-  mctx.fillRect(player.x*scale,player.y*scale,scale,scale);
+  mctx.fillStyle="orange"; mctx.fillRect(player.x*scale,player.y*scale,scale,scale);
 }
 
-// ========== 移動 ==========
+// ====== 移動 ======
 function move(dx,dy){
   const nx=player.x+dx,ny=player.y+dy;
-  if(nx<0||ny<0||nx>=W||ny>=H) return;
-  if(map[ny][nx]===T.RIVER) return;
-  player.x=nx;player.y=ny;sfxMove();
-  draw();
+  if(nx<0||ny<0||nx>=W||ny>=H) return; if(map[ny][nx]===T.RIVER) return;
+  player.x=nx;player.y=ny; sfxMove();
+  $("php").textContent=player.hp; $("phpfill").style.width=(player.hp/player.max*100)+"%"; draw();
+  if(Math.random()<0.05 && ![T.TOWN,T.VILLAGE,T.CASTLE,T.TEMPLE].includes(map[ny][nx])) startBattle(false);
+  if(map[ny][nx]===T.CAVE) startBattle(true);
+  if(map[ny][nx]===T.TOWN) openShop("town");
+  if(map[ny][nx]===T.VILLAGE) openShop("village");
+  if(map[ny][nx]===T.TEMPLE) enterTemple();
 }
 document.querySelectorAll(".dpad .btn").forEach(b=>{
   b.onclick=()=>{const d=b.dataset.dir;if(d==="up")move(0,-1);if(d==="down")move(0,1);if(d==="left")move(-1,0);if(d==="right")move(1,0);}
 });
+$("btnA").onclick=()=>{ /* NPC会話(省略:配置済みNPCならtalkToNPC呼び出し可) */ };
 
-// 決定ボタンでNPC会話判定
-$("btnA").onclick=()=>{
-  for(const npc of npcs){
-    if(player.x===npc.x && player.y===npc.y){
-      talkToNPC(npc.type);
-    }
-  }
-};
-
-draw();
-startFieldBGM();
+draw(); startFieldBGM();
 
 })();
 </script>
