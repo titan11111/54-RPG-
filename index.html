@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>NEO FIELD QUEST</title>
 <style>
   body{margin:0;background:#0b0f14;color:#e5f1ff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;overflow:hidden}
@@ -25,6 +25,15 @@
   .card{background:#08111b;border:2px solid #20ffe3;border-radius:12px;padding:20px;min-width:280px;text-align:center}
   .hidden{display:none}
   #shopItems button{display:block;width:100%;margin:6px 0;padding:10px;font-size:18px}
+
+  @media (orientation:portrait){
+    canvas{width:90vw;height:90vw}
+    .controller{flex-direction:column;align-items:center;gap:20px;padding:0 0 20px}
+    .dpad{grid-template-columns:repeat(3,60px);grid-template-rows:repeat(3,60px)}
+    .dpad button{width:60px;height:60px;font-size:24px;border-radius:12px}
+    .buttons{flex-direction:row}
+    .buttons button{width:80px;height:60px;font-size:20px}
+  }
 </style>
 </head>
 <body>
@@ -111,6 +120,10 @@
 </div>
 
 <script>
+document.addEventListener('touchstart',e=>{if(e.touches.length>1)e.preventDefault();},{passive:false});
+let lastTouchEnd=0;
+document.addEventListener('touchend',e=>{const now=Date.now();if(now-lastTouchEnd<=300)e.preventDefault();lastTouchEnd=now;},false);
+
 (()=>{
 // ===== util
 const $=id=>document.getElementById(id);
