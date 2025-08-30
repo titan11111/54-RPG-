@@ -97,6 +97,7 @@
   <div class="card">
     <h2>バッグ</h2>
     <div id="bagItems"></div>
+    <button class="btn B" id="bagBack">バック</button>
   </div>
 </div>
 
@@ -260,6 +261,12 @@ $('bagBtn').onclick=()=>{
   }else{
     o.classList.add('hidden'); uiLocked=false;
   }
+};
+
+// バッグ画面から戻る
+$('bagBack').onclick=()=>{
+  $('bagOverlay').classList.add('hidden');
+  uiLocked=false;
 };
 
 function openCastle(){
