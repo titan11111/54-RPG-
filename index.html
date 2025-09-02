@@ -144,6 +144,7 @@ const rand=(n)=>Math.floor(Math.random()*n);
 let steps=0;              // 累計移動マス
 const STEP_INTERVAL=10;   // この歩数ごとに敵出現（頻度アップ）
 const EXP_PER_LEVEL=20;   // レベルアップに必要な経験値増分
+let oniDefeated=false;    // 鬼撃破フラグ
 
 // ===== Audio
 const AudioContext=window.AudioContext||window.webkitAudioContext;
@@ -164,7 +165,7 @@ function startBattleBGM(){ if(bgmInterval) return; const notes=[220,262,294,330]
 
 // ===== map
 const TILE=16,W=64,H=64;
-const T={GRASS:0,TOWN:1,CASTLE:2,CAVE:3,VILLAGE:4,FOREST:5,RIVER:6};
+const T={GRASS:0,TOWN:1,CASTLE:2,CAVE:3,VILLAGE:4,FOREST:5,RIVER:6,BLUECASTLE:7};
 const map=[...Array(H)].map(()=>Array(W).fill(T.GRASS));
 // 地形
 for(let y=0;y<H;y++)for(let x=0;x<W;x++){
@@ -181,6 +182,7 @@ map[10][20]=T.VILLAGE;    // その右：村
 map[20][45]=T.TOWN;       // 中央右：町
 map[55][40]=T.TOWN;       // 右下：町
 map[25][50]=T.VILLAGE;    // 中央右下：村
+map[55][55]=T.BLUECASTLE; // 南東：青い城
 
 const placeName=t=>{
   switch(t){
@@ -191,6 +193,7 @@ const placeName=t=>{
     case T.VILLAGE: return "村";
     case T.CASTLE: return "城";
     case T.CAVE: return "洞窟";
+    case T.BLUECASTLE: return "青い城";
   }
 }
 
@@ -303,10 +306,13 @@ const rares=[
   {name:'はぐれねこくん',hp:10,atk:[4,8],exp:40,gold:60},
   {name:'クルミっぽ',hp:12,atk:[5,9],exp:50,gold:80}
 ];
-function startBattle(isBoss=false){
+function startBattle(isBoss=false, enemyData=null){
   boss=isBoss; stopBGM(); startBattleBGM(); uiLocked=true;
-  if(boss){ enemy={name:'魔王',hp:50,atk:[6,12],exp:120,gold:300}; }
-  else{
+  if(enemyData){
+    enemy={...enemyData};
+  } else if(boss){
+    enemy={name:'魔王',hp:50,atk:[6,12],exp:120,gold:300};
+  } else {
     const pool=(Math.random()<0.33)?commons.concat(rares):commons;
     const e=pool[rand(pool.length)]; enemy={...e};
   }
@@ -323,9 +329,10 @@ $('atkBtn').onclick=()=>{
       player.exp-=player.lv*EXP_PER_LEVEL;
       player.lv++; player.max+=5; player.hp=player.max;
     }
+    if(enemy.name==='鬼'){ oniDefeated=true; }
     updateHUD();
     stopBGM(); startFieldBGM();
-    if(boss){ showEnding(); }
+    if(enemy.name==='魔王'){ showEnding(); }
     return;
   }
   setTimeout(()=>{ // 反撃
@@ -361,6 +368,7 @@ function draw(){
     if(t===T.TOWN)   e='🏘️';
     if(t===T.VILLAGE)e='🛖';
     if(t===T.CASTLE) e='🏰';
+    if(t===T.BLUECASTLE) e='🏯';
     if(t===T.CAVE)   e='🕳️';
     if(e) ctx.fillText(e,px+2,py+14);
   }
@@ -375,6 +383,10 @@ function drawMini(){
       if(map[y][x]===tt) mctx.fillRect(x*sc,y*sc,sc,sc);
     }
   });
+  mctx.fillStyle='#00f';
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    if(map[y][x]===T.BLUECASTLE) mctx.fillRect(x*sc,y*sc,sc,sc);
+  }
   mctx.fillStyle='orange'; mctx.fillRect(player.x*sc,player.y*sc,sc,sc);
 }
 
@@ -387,6 +399,7 @@ function handleTileEntry(t){
   if(t===T.TOWN){ openShop('town'); return; }
   if(t===T.VILLAGE){ openShop('village'); return; }
   if(t===T.CASTLE){ openCastle(); return; }
+  if(t===T.BLUECASTLE){ if(!oniDefeated) startBattle(true,{name:'鬼',hp:60,atk:[7,11],exp:150,gold:200}); return; }
   if(t===T.CAVE){ startBattle(true); return; }
 
   // フィールドエンカ：一定歩数ごとに出現
