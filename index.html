@@ -332,11 +332,31 @@ let enemy=null, boss=false;
 const commons=[
   {name:'スライム',hp:8,atk:[1,3],exp:5,gold:10},
   {name:'仙人マン',hp:15,atk:[2,5],exp:8,gold:18},
-  {name:'はなくん',hp:20,atk:[3,6],exp:12,gold:25}
+  {name:'はなくん',hp:20,atk:[3,6],exp:12,gold:25},
+  {name:'あかおに',hp:25,atk:[4,7],exp:15,gold:30,desc:'大きな体でこんぼうをふり回す。'},
+  {name:'あおおに',hp:22,atk:[3,6],exp:14,gold:28,desc:'つめたい風をあやつるおに。'},
+  {name:'かっぱ',hp:18,atk:[3,5],exp:13,gold:24,desc:'きゅうりが好きな川のいたずら者。'},
+  {name:'ろくろくび',hp:16,atk:[2,5],exp:12,gold:22,desc:'首がのびておどかしてくる女の妖怪。'},
+  {name:'のっぺらぼう',hp:14,atk:[2,4],exp:10,gold:20,desc:'顔がない人。とつぜん目の前に出る。'},
+  {name:'からかさおばけ',hp:12,atk:[1,4],exp:9,gold:18,desc:'一つ目でピョンピョンはねるかさ。'},
+  {name:'ちょうちんおばけ',hp:15,atk:[2,4],exp:11,gold:21,desc:'赤くひかるちょうちん。火をふく。'},
+  {name:'おばけひとだま',hp:10,atk:[1,3],exp:8,gold:16,desc:'ふわふわただよう光る玉。'},
+  {name:'ゆうれいむすめ',hp:12,atk:[2,4],exp:10,gold:18,desc:'白いきものの女の子。泣いた声でのろう。'},
+  {name:'こだま',hp:10,atk:[1,3],exp:7,gold:15,desc:'山の木にやどる声の妖怪。声をまねする。'},
+  {name:'すいかおばけ',hp:20,atk:[3,5],exp:14,gold:25,desc:'大きなすいかが足をはやしておそってくる。'},
+  {name:'ひとつめこぞう',hp:14,atk:[2,4],exp:11,gold:20,desc:'目が一つの子ども妖怪。石をなげてくる。'},
+  {name:'おにび',hp:13,atk:[2,5],exp:10,gold:19,desc:'あかやあおの火の玉。さわるとやけど。'},
+  {name:'こぎつね',hp:11,atk:[1,4],exp:9,gold:17,desc:'人にばける小さなきつね。'},
+  {name:'いしだまおばけ',hp:18,atk:[3,5],exp:13,gold:23,desc:'まるい石があつまってできたおばけ。'}
 ];
 const rares=[
   {name:'はぐれねこくん',hp:10,atk:[4,8],exp:40,gold:60},
-  {name:'クルミっぽ',hp:12,atk:[5,9],exp:50,gold:80}
+  {name:'クルミっぽ',hp:12,atk:[5,9],exp:50,gold:80},
+  {name:'てんぐ',hp:28,atk:[5,8],exp:40,gold:60,desc:'長いはなで空をとぶ。うちわで風をおこす。'},
+  {name:'ぬらりひょん',hp:30,atk:[5,9],exp:45,gold:70,desc:'人の家にしれっと上がりこむ妖怪。'},
+  {name:'がしゃどくろ',hp:40,atk:[6,9],exp:60,gold:90,desc:'大きなほねのかいぶつ。夜に出る。'},
+  {name:'わらべおに',hp:26,atk:[4,7],exp:38,gold:55,desc:'子どものような姿のおに。集団でくる。'},
+  {name:'ぬりかべ',hp:35,atk:[4,7],exp:50,gold:80,desc:'大きなかべの妖怪。行く手をふさぐ。'}
 ];
 function startBattle(isBoss=false){
   boss=isBoss; stopBGM(); boss? startBossBGM() : startBattleBGM(); uiLocked=true;
